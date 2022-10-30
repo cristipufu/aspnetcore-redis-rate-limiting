@@ -13,7 +13,7 @@ namespace RedisRateLimiting
         private readonly string _policyName;
         private readonly IConnectionMultiplexer _connectionMultiplexer;
 
-        private static readonly LuaScript _incrementScript = LuaScript.Prepare(
+        private static readonly LuaScript _redisScript = LuaScript.Prepare(
           @"local expires_at_key = @rate_limit_key .. "":exp""
             local expires_at = tonumber(redis.call(""get"", expires_at_key))
 
@@ -97,7 +97,7 @@ namespace RedisRateLimiting
             var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
 
             var response = (RedisValue[]?)database.ScriptEvaluate(
-                _incrementScript,
+                _redisScript,
                 new
                 {
                     rate_limit_key = $"rl:{_policyName}",

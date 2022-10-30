@@ -8,11 +8,11 @@ var connectionMultiplexer = ConnectionMultiplexer.Connect(redisOptions);
 
 builder.Services.AddRateLimiter(options =>
 {
-    //options.AddRedisConcurrencyLimiter("demo_concurrency", (opt) =>
-    //{
-    //    opt.ConnectionMultiplexer = connectionMultiplexer;
-    //    opt.PermitLimit = 1;
-    //});
+    options.AddRedisConcurrencyLimiter("demo_concurrency", (opt) =>
+    {
+        opt.ConnectionMultiplexer = connectionMultiplexer;
+        opt.PermitLimit = 2;
+    });
 
     //options.AddRedisTokenBucketLimiter("demo_token_bucket", (opt) =>
     //{

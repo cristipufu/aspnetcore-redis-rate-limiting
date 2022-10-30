@@ -13,7 +13,20 @@ namespace RedisRateLimiting
         private readonly string _policyName;
         private readonly IConnectionMultiplexer _connectionMultiplexer;
 
-        private static readonly ConcurrencyLease FailedLease = new(false, null, 0);
+        private static readonly LuaScript _redisScript = LuaScript.Prepare(
+          @"local limit = tonumber(@permit_limit)
+            local timestamp = tonumber(@current_time)
+
+            local count = redis.call(""zcard"", @rate_limit_key)
+            local allowed = count < limit
+
+            if allowed then
+                redis.call(""zadd"", @rate_limit_key, timestamp, @unique_id)
+            end
+
+            return { allowed, count }");
+
+        private static readonly ConcurrencyLease FailedLease = new(false, null, null);
 
         public override TimeSpan? IdleDuration => TimeSpan.Zero;
 
@@ -60,19 +73,45 @@ namespace RedisRateLimiting
                 throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.PermitLimit));
             }
 
-            if (true)
+            var database = _connectionMultiplexer.GetDatabase();
+
+            var now = DateTimeOffset.UtcNow;
+            var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
+
+            var id = Guid.NewGuid().ToString();
+
+            var response = (RedisValue[]?)database.ScriptEvaluate(
+                _redisScript,
+                new
+                {
+                    permit_limit = _options.PermitLimit,
+                    rate_limit_key = $"rl:{_policyName}",
+                    current_time = nowUnixTimeSeconds,
+                    unique_id = id,
+                });
+
+            bool allowed = false;
+            long count = 1;
+
+            if (response != null)
             {
-                return new ConcurrencyLease(isAcquired: true, this, permitCount);
+                allowed = (bool)response[0];
+                count = (long)response[1];
             }
-            else
+
+            if (allowed)
             {
-                return FailedLease;
+                return new ConcurrencyLease(isAcquired: true, this, id);
             }
+
+            return new ConcurrencyLease(isAcquired: false, this, id);
         }
 
-        private void Release(int releaseCount)
+        private void Release(string id)
         {
-            //_count--;
+            var database = _connectionMultiplexer.GetDatabase();
+
+            database.SortedSetRemove($"rl:{_policyName}", id);
         }
 
         private sealed class ConcurrencyLease : RateLimitLease
@@ -81,14 +120,14 @@ namespace RedisRateLimiting
 
             private bool _disposed;
             private readonly RedisConcurrencyRateLimiter? _limiter;
-            private readonly int _count;
+            private readonly string? _id;
             private readonly string? _reason;
 
-            public ConcurrencyLease(bool isAcquired, RedisConcurrencyRateLimiter? limiter, int count, string? reason = null)
+            public ConcurrencyLease(bool isAcquired, RedisConcurrencyRateLimiter? limiter, string? id, string? reason = null)
             {
                 IsAcquired = isAcquired;
                 _limiter = limiter;
-                _count = count;
+                _id = id;
                 _reason = reason;
             }
 
@@ -116,7 +155,10 @@ namespace RedisRateLimiting
 
                 _disposed = true;
 
-                _limiter?.Release(_count);
+                if (_id != null)
+                {
+                    _limiter?.Release(_id);
+                }
             }
         }
     }
