@@ -14,11 +14,13 @@ builder.Services.AddRateLimiter(options =>
         opt.PermitLimit = 2;
     });
 
-    //options.AddRedisTokenBucketLimiter("demo_token_bucket", (opt) =>
-    //{
-    //    opt.ConnectionMultiplexer = connectionMultiplexer;
-    //    opt.PermitLimit = 1;
-    //});
+    options.AddRedisTokenBucketLimiter("demo_token_bucket", (opt) =>
+    {
+        opt.ConnectionMultiplexerFactory = () => connectionMultiplexer;
+        opt.TokenLimit = 2;
+        opt.TokensPerPeriod = 1;
+        opt.ReplenishmentPeriod = TimeSpan.FromSeconds(2);
+    });
 
     options.AddRedisFixedWindowLimiter("demo_fixed_window", (opt) =>
     {
