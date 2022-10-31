@@ -7,10 +7,10 @@ using System.Threading.Tasks;
 
 namespace RedisRateLimiting
 {
-    public class RedisTokenBucketRateLimiter : RateLimiter
+    public class RedisTokenBucketRateLimiter<TKey> : RateLimiter
     {
         private readonly RedisTokenBucketRateLimiterOptions _options;
-        private readonly string _policyName;
+        private readonly TKey _partitionKey;
         private readonly IConnectionMultiplexer _connectionMultiplexer;
 
         private static readonly LuaScript _redisScript = LuaScript.Prepare(
@@ -52,7 +52,7 @@ namespace RedisRateLimiting
 
         public override TimeSpan? IdleDuration => TimeSpan.Zero;
 
-        public RedisTokenBucketRateLimiter(string policyName, RedisTokenBucketRateLimiterOptions options)
+        public RedisTokenBucketRateLimiter(TKey partitionKey, RedisTokenBucketRateLimiterOptions options)
         {
             if (options is null)
             {
@@ -75,7 +75,7 @@ namespace RedisRateLimiting
                 throw new ArgumentException(string.Format("{0} must not be null.", nameof(options.ConnectionMultiplexerFactory)), nameof(options));
             }
 
-            _policyName = policyName;
+            _partitionKey = partitionKey;
 
             _options = new RedisTokenBucketRateLimiterOptions
             {
@@ -109,7 +109,7 @@ namespace RedisRateLimiting
                 _redisScript,
                 new
                 {
-                    rate_limit_key = $"rl:{_policyName}",
+                    rate_limit_key = $"rl:{_partitionKey}",
                     current_time = nowUnixTimeSeconds,
                     tokens_per_period = _options.TokensPerPeriod,
                     token_limit = _options.TokenLimit,

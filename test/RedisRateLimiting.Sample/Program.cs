@@ -1,10 +1,14 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using RedisRateLimiting;
+using RedisRateLimiting.Sample.Samples;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var redisOptions = ConfigurationOptions.Parse(",ssl=True,abortConnect=False");
 var connectionMultiplexer = ConnectionMultiplexer.Connect(redisOptions);
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp => connectionMultiplexer);
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -28,6 +32,10 @@ builder.Services.AddRateLimiter(options =>
         opt.PermitLimit = 1;
         opt.Window = TimeSpan.FromSeconds(2);
     });
+
+    options.AddPolicy<string, ClientIdRateLimiterPolicy>("demo_client_id");
+
+    options.AddPolicy("demo_client_id2", new ClientIdRateLimiterPolicy(connectionMultiplexer, NullLogger<ClientIdRateLimiterPolicy>.Instance));
 
     options.OnRejected = (context, token) =>
     {

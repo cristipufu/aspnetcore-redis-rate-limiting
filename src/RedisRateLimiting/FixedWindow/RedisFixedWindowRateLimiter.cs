@@ -7,10 +7,10 @@ using System.Threading.Tasks;
 
 namespace RedisRateLimiting
 {
-    public class RedisFixedWindowRateLimiter : RateLimiter
+    public class RedisFixedWindowRateLimiter<TKey> : RateLimiter
     {
         private readonly RedisFixedWindowRateLimiterOptions _options;
-        private readonly string _policyName;
+        private readonly TKey _partitionKey;
         private readonly IConnectionMultiplexer _connectionMultiplexer;
 
         private static readonly LuaScript _redisScript = LuaScript.Prepare(
@@ -43,7 +43,7 @@ namespace RedisRateLimiting
 
         public override TimeSpan? IdleDuration => TimeSpan.Zero;
 
-        public RedisFixedWindowRateLimiter(string policyName, RedisFixedWindowRateLimiterOptions options)
+        public RedisFixedWindowRateLimiter(TKey partitionKey, RedisFixedWindowRateLimiterOptions options)
         {
             if (options is null)
             {
@@ -69,7 +69,7 @@ namespace RedisRateLimiting
                 ConnectionMultiplexerFactory = options.ConnectionMultiplexerFactory,
             };
 
-            _policyName = policyName;
+            _partitionKey = partitionKey;
 
             _connectionMultiplexer = _options.ConnectionMultiplexerFactory();
         }
@@ -95,7 +95,7 @@ namespace RedisRateLimiting
                 _redisScript,
                 new
                 {
-                    rate_limit_key = $"rl:{_policyName}",
+                    rate_limit_key = $"rl:{_partitionKey}",
                     next_expires_at = now.Add(_options.Window).ToUnixTimeSeconds(),
                     current_time = nowUnixTimeSeconds,
                     increment_amount = 1D,

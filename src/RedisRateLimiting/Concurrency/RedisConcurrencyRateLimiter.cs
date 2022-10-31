@@ -7,10 +7,10 @@ using System.Threading.Tasks;
 
 namespace RedisRateLimiting
 {
-    public class RedisConcurrencyRateLimiter : RateLimiter
+    public class RedisConcurrencyRateLimiter<TKey> : RateLimiter
     {
         private readonly RedisConcurrencyRateLimiterOptions _options;
-        private readonly string _policyName;
+        private readonly TKey _partitionKey;
         private readonly IConnectionMultiplexer _connectionMultiplexer;
 
         private static readonly LuaScript _redisScript = LuaScript.Prepare(
@@ -30,7 +30,7 @@ namespace RedisRateLimiting
 
         public override TimeSpan? IdleDuration => TimeSpan.Zero;
 
-        public RedisConcurrencyRateLimiter(string policyName, RedisConcurrencyRateLimiterOptions options)
+        public RedisConcurrencyRateLimiter(TKey partitionKey, RedisConcurrencyRateLimiterOptions options)
         {
             if (options is null)
             {
@@ -45,7 +45,7 @@ namespace RedisRateLimiting
                 throw new ArgumentException(string.Format("{0} must not be null.", nameof(options.ConnectionMultiplexerFactory)), nameof(options));
             }
 
-            _policyName = policyName;
+            _partitionKey = partitionKey;
 
             _options = new RedisConcurrencyRateLimiterOptions
             {
@@ -80,7 +80,7 @@ namespace RedisRateLimiting
                 new
                 {
                     permit_limit = _options.PermitLimit,
-                    rate_limit_key = $"rl:{_policyName}",
+                    rate_limit_key = $"rl:{_partitionKey}",
                     current_time = nowUnixTimeSeconds,
                     unique_id = id,
                 });
@@ -111,7 +111,7 @@ namespace RedisRateLimiting
         {
             var database = _connectionMultiplexer.GetDatabase();
             // how to use async? if only RateLimitLease would implement IAsyncDisposable
-            database.SortedSetRemove($"rl:{_policyName}", id);
+            database.SortedSetRemove($"rl:{_partitionKey}", id);
         }
 
         private sealed class ConcurrencyLease : RateLimitLease
@@ -119,11 +119,11 @@ namespace RedisRateLimiting
             private static readonly string[] s_allMetadataNames = new[] { MetadataName.ReasonPhrase.Name };
 
             private bool _disposed;
-            private readonly RedisConcurrencyRateLimiter? _limiter;
+            private readonly RedisConcurrencyRateLimiter<TKey>? _limiter;
             private readonly string? _id;
             private readonly string? _reason;
 
-            public ConcurrencyLease(bool isAcquired, RedisConcurrencyRateLimiter? limiter, string? id, string? reason = null)
+            public ConcurrencyLease(bool isAcquired, RedisConcurrencyRateLimiter<TKey>? limiter, string? id, string? reason = null)
             {
                 IsAcquired = isAcquired;
                 _limiter = limiter;
