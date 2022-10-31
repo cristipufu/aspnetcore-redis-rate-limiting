@@ -10,7 +10,7 @@ builder.Services.AddRateLimiter(options =>
 {
     options.AddRedisConcurrencyLimiter("demo_concurrency", (opt) =>
     {
-        opt.ConnectionMultiplexer = connectionMultiplexer;
+        opt.ConnectionMultiplexerFactory = () => connectionMultiplexer;
         opt.PermitLimit = 2;
     });
 
@@ -22,7 +22,7 @@ builder.Services.AddRateLimiter(options =>
 
     options.AddRedisFixedWindowLimiter("demo_fixed_window", (opt) =>
     {
-        opt.ConnectionMultiplexer = connectionMultiplexer;
+        opt.ConnectionMultiplexerFactory = () => connectionMultiplexer;
         opt.PermitLimit = 1;
         opt.Window = TimeSpan.FromSeconds(2);
     });

@@ -40,20 +40,20 @@ namespace RedisRateLimiting
             {
                 throw new ArgumentException(string.Format("{0} must be set to a value greater than 0.", nameof(options.PermitLimit)), nameof(options));
             }
-            if (options.ConnectionMultiplexer is null)
+            if (options.ConnectionMultiplexerFactory is null)
             {
-                throw new ArgumentException(string.Format("{0} must not be null.", nameof(options.ConnectionMultiplexer)), nameof(options));
+                throw new ArgumentException(string.Format("{0} must not be null.", nameof(options.ConnectionMultiplexerFactory)), nameof(options));
             }
 
             _policyName = policyName;
 
             _options = new RedisConcurrencyRateLimiterOptions
             {
-                ConnectionMultiplexer = options.ConnectionMultiplexer,
+                ConnectionMultiplexerFactory = options.ConnectionMultiplexerFactory,
                 PermitLimit = options.PermitLimit,
             };
 
-            _connectionMultiplexer = _options.ConnectionMultiplexer;
+            _connectionMultiplexer = _options.ConnectionMultiplexerFactory();
         }
 
         public override RateLimiterStatistics? GetStatistics()
@@ -61,12 +61,7 @@ namespace RedisRateLimiting
             throw new NotImplementedException();
         }
 
-        protected override ValueTask<RateLimitLease> AcquireAsyncCore(int permitCount, CancellationToken cancellationToken)
-        {
-            return new ValueTask<RateLimitLease>(FailedLease);
-        }
-
-        protected override RateLimitLease AttemptAcquireCore(int permitCount)
+        protected override async ValueTask<RateLimitLease> AcquireAsyncCore(int permitCount, CancellationToken cancellationToken)
         {
             if (permitCount > _options.PermitLimit)
             {
@@ -80,7 +75,7 @@ namespace RedisRateLimiting
 
             var id = Guid.NewGuid().ToString();
 
-            var response = (RedisValue[]?)database.ScriptEvaluate(
+            var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
                 _redisScript,
                 new
                 {
@@ -107,10 +102,15 @@ namespace RedisRateLimiting
             return new ConcurrencyLease(isAcquired: false, this, id);
         }
 
+        protected override RateLimitLease AttemptAcquireCore(int permitCount)
+        {
+            return FailedLease;
+        }
+
         private void Release(string id)
         {
             var database = _connectionMultiplexer.GetDatabase();
-
+            // how to use async? if only RateLimitLease would implement IAsyncDisposable
             database.SortedSetRemove($"rl:{_policyName}", id);
         }
 

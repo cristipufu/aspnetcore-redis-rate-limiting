@@ -57,21 +57,21 @@ namespace RedisRateLimiting
             {
                 throw new ArgumentException(string.Format("{0} must be set to a value greater than TimeSpan.Zero.", nameof(options.Window)), nameof(options));
             }
-            if (options.ConnectionMultiplexer is null)
+            if (options.ConnectionMultiplexerFactory is null)
             {
-                throw new ArgumentException(string.Format("{0} must not be null.", nameof(options.ConnectionMultiplexer)), nameof(options));
+                throw new ArgumentException(string.Format("{0} must not be null.", nameof(options.ConnectionMultiplexerFactory)), nameof(options));
             }
 
             _options = new RedisFixedWindowRateLimiterOptions
             {
                 PermitLimit = options.PermitLimit,
                 Window = options.Window,
-                ConnectionMultiplexer = options.ConnectionMultiplexer,
+                ConnectionMultiplexerFactory = options.ConnectionMultiplexerFactory,
             };
 
             _policyName = policyName;
 
-            _connectionMultiplexer = _options.ConnectionMultiplexer;
+            _connectionMultiplexer = _options.ConnectionMultiplexerFactory();
         }
 
         public override RateLimiterStatistics? GetStatistics()
@@ -79,12 +79,7 @@ namespace RedisRateLimiting
             throw new NotImplementedException();
         }
 
-        protected override ValueTask<RateLimitLease> AcquireAsyncCore(int permitCount, CancellationToken cancellationToken)
-        {
-            return new ValueTask<RateLimitLease>(FailedLease);
-        }
-
-        protected override RateLimitLease AttemptAcquireCore(int permitCount)
+        protected override async ValueTask<RateLimitLease> AcquireAsyncCore(int permitCount, CancellationToken cancellationToken)
         {
             if (permitCount > _options.PermitLimit)
             {
@@ -96,7 +91,7 @@ namespace RedisRateLimiting
             var now = DateTimeOffset.UtcNow;
             var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
 
-            var response = (RedisValue[]?)database.ScriptEvaluate(
+            var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
                 _redisScript,
                 new
                 {
@@ -121,6 +116,11 @@ namespace RedisRateLimiting
             }
 
             return SuccessfulLease;
+        }
+
+        protected override RateLimitLease AttemptAcquireCore(int permitCount)
+        {
+            return FailedLease;
         }
 
         private sealed class FixedWindowLease : RateLimitLease

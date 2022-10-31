@@ -27,20 +27,20 @@ namespace RedisRateLimiting
             {
                 throw new ArgumentException(string.Format("{0} must be set to a value greater than 0.", nameof(options.PermitLimit)), nameof(options));
             }
-            if (options.ConnectionMultiplexer is null)
+            if (options.ConnectionMultiplexerFactory is null)
             {
-                throw new ArgumentException(string.Format("{0} must not be null.", nameof(options.ConnectionMultiplexer)), nameof(options));
+                throw new ArgumentException(string.Format("{0} must not be null.", nameof(options.ConnectionMultiplexerFactory)), nameof(options));
             }
 
             _policyName = policyName;
 
             _options = new RedisTokenBucketRateLimiterOptions
             {
-                ConnectionMultiplexer = options.ConnectionMultiplexer,
+                ConnectionMultiplexerFactory = options.ConnectionMultiplexerFactory,
                 PermitLimit = options.PermitLimit,
             };
 
-            _connectionMultiplexer = _options.ConnectionMultiplexer;
+            _connectionMultiplexer = _options.ConnectionMultiplexerFactory();
         }
 
         public override RateLimiterStatistics? GetStatistics()
