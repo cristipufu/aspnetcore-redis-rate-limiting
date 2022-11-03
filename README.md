@@ -11,7 +11,7 @@ For more advanced use cases you can check out the [official documentation here](
 
 # install
 ```xml
-PM> Install-Package RedisRateLimiting -Version 1.0.4
+PM> Install-Package RedisRateLimiting
 ```
 
 # strategies
