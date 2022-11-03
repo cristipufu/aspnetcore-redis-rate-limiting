@@ -16,7 +16,9 @@ namespace RedisRateLimiting
         private static readonly LuaScript _redisScript = LuaScript.Prepare(
           @"local limit = tonumber(@permit_limit)
             local timestamp = tonumber(@current_time)
+            local ttl = 60
 
+            redis.call(""zremrangebyscore"", @rate_limit_key, '-inf', timestamp - ttl)
             local count = redis.call(""zcard"", @rate_limit_key)
             local allowed = count < limit
 
