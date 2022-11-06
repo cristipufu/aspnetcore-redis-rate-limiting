@@ -50,6 +50,7 @@ namespace RedisRateLimiting
             {
                 PermitLimit = options.PermitLimit,
                 Window = options.Window,
+                SegmentsPerWindow = options.SegmentsPerWindow,
                 ConnectionMultiplexerFactory = options.ConnectionMultiplexerFactory,
             };
 
