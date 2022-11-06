@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc.Testing;
+using RedisRateLimiting.Sample;
+using System.Net;
 using Xunit;
 
 namespace RedisRateLimiting.Tests
@@ -19,7 +21,7 @@ namespace RedisRateLimiting.Tests
         [Fact]
         public async Task GetRequestsEnforceLimit()
         {
-            var tasks = new List<Task<int>>();
+            var tasks = new List<Task<RateLimitResponse>>();
 
             for (var i = 0; i < 5; i++)
             {
@@ -28,19 +30,52 @@ namespace RedisRateLimiting.Tests
 
             await Task.WhenAll(tasks);
 
-            Assert.Equal(3, tasks.Count(x => x.Result == 429));
+            Assert.Equal(3, tasks.Count(x => x.Result.StatusCode == HttpStatusCode.TooManyRequests));
+            Assert.Equal(3, tasks.Count(x => x.Result.Limit == 2));
+            Assert.Equal(3, tasks.Count(x => x.Result.Remaining == 0));
 
             await Task.Delay(1000);
 
-            var statusCode = await MakeRequestAsync();
-            Assert.Equal(200, statusCode);
+            var response = await MakeRequestAsync();
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            // Find a way to send rate limit headers when request is successful as well
+            Assert.Null(response.Limit); 
+            Assert.Null(response.Remaining);
         }
 
-        private async Task<int> MakeRequestAsync()
+        private async Task<RateLimitResponse> MakeRequestAsync()
         {
             using var request = new HttpRequestMessage(new HttpMethod("GET"), _apiPath);
             using var response = await _httpClient.SendAsync(request);
-            return (int)response.StatusCode;
+
+            var rateLimitResponse = new RateLimitResponse
+            {
+                StatusCode = response.StatusCode,
+            };
+
+            if (response.Headers.TryGetValues(RateLimitHeaders.Limit, out var valuesLimit)
+                && long.TryParse(valuesLimit.FirstOrDefault(), out var limit))
+            {
+                rateLimitResponse.Limit = limit;
+            }
+
+            if (response.Headers.TryGetValues(RateLimitHeaders.Remaining, out var valuesRemaining)
+                && long.TryParse(valuesRemaining.FirstOrDefault(), out var remaining))
+            {
+                rateLimitResponse.Remaining = remaining;
+            }
+
+            return rateLimitResponse;
+        }
+
+        private sealed class RateLimitResponse
+        {
+            public HttpStatusCode StatusCode { get; set; }
+
+            public long? Limit { get; set; }
+
+            public long? Remaining { get; set; }
         }
     }
 }

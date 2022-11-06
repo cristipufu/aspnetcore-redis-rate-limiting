@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using RedisRateLimiting;
+using RedisRateLimiting.Sample;
 using RedisRateLimiting.Sample.Samples;
 using StackExchange.Redis;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -47,6 +49,27 @@ builder.Services.AddRateLimiter(options =>
     options.OnRejected = (context, token) =>
     {
         context.HttpContext.Response.StatusCode = 429;
+
+        if (context.Lease.TryGetMetadata(RateLimitMetadataName.Limit, out var limit))
+        {
+            context.HttpContext.Response.Headers[RateLimitHeaders.Limit] = limit;
+        }
+
+        if (context.Lease.TryGetMetadata(RateLimitMetadataName.Remaining, out var remaining))
+        {
+            context.HttpContext.Response.Headers[RateLimitHeaders.Remaining] = remaining.ToString();
+        }
+
+        if (context.Lease.TryGetMetadata(RateLimitMetadataName.Reset, out var reset))
+        {
+            context.HttpContext.Response.Headers[RateLimitHeaders.Reset] = reset.ToString();
+        }
+
+        if (context.Lease.TryGetMetadata(RateLimitMetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers[RateLimitHeaders.RetryAfter] = retryAfter.ToString();
+        }
+
         return ValueTask.CompletedTask;
     };
 });

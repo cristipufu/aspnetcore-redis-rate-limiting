@@ -100,10 +100,15 @@ namespace RedisRateLimiting
                 throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.TokenLimit));
             }
 
-            var database = _connectionMultiplexer.GetDatabase();
+            var leaseContext = new TokenBucketLeaseContext
+            {
+                Limit = _options.TokenLimit,
+            };
 
             var now = DateTimeOffset.UtcNow;
             var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
+
+            var database = _connectionMultiplexer.GetDatabase();
 
             var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
                 _redisScript,
@@ -118,20 +123,19 @@ namespace RedisRateLimiting
                 });
 
             bool allowed = false;
-            long count = 1;
 
             if (response != null)
             {
                 allowed = (bool)response[0];
-                count = (long)response[1];
+                leaseContext.Count = (long)response[1];
             }
 
             if (allowed)
             {
-                return new TokenBucketLease(isAcquired: true, retryAfter: null);
+                return new TokenBucketLease(isAcquired: true, leaseContext);
             }
 
-            return FailedLease;
+            return new TokenBucketLease(isAcquired: false, leaseContext);
         }
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
@@ -139,16 +143,25 @@ namespace RedisRateLimiting
             return FailedLease;
         }
 
+        private sealed class TokenBucketLeaseContext
+        {
+            public long Count { get; set; }
+
+            public long Limit { get; set; }
+
+            public TimeSpan? RetryAfter { get; set; }
+        }
+
         private sealed class TokenBucketLease : RateLimitLease
         {
             private static readonly string[] s_allMetadataNames = new[] { MetadataName.RetryAfter.Name };
 
-            private readonly TimeSpan? _retryAfter;
+            private readonly TokenBucketLeaseContext? _context;
 
-            public TokenBucketLease(bool isAcquired, TimeSpan? retryAfter)
+            public TokenBucketLease(bool isAcquired, TokenBucketLeaseContext? context)
             {
                 IsAcquired = isAcquired;
-                _retryAfter = retryAfter;
+                _context = context;
             }
 
             public override bool IsAcquired { get; }
@@ -157,9 +170,21 @@ namespace RedisRateLimiting
 
             public override bool TryGetMetadata(string metadataName, out object? metadata)
             {
-                if (metadataName == MetadataName.RetryAfter.Name && _retryAfter.HasValue)
+                if (metadataName == RateLimitMetadataName.Limit.Name && _context is not null)
                 {
-                    metadata = _retryAfter.Value;
+                    metadata = _context.Limit.ToString();
+                    return true;
+                }
+
+                if (metadataName == RateLimitMetadataName.Remaining.Name && _context is not null)
+                {
+                    metadata = _context.Count;
+                    return true;
+                }
+
+                if (metadataName == RateLimitMetadataName.RetryAfter.Name && _context?.RetryAfter is not null)
+                {
+                    metadata = (int)_context.RetryAfter.Value.TotalSeconds;
                     return true;
                 }
 

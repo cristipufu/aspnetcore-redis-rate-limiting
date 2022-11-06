@@ -38,7 +38,6 @@ namespace RedisRateLimiting
 
             return { current, expires_at }");
 
-        private static readonly RateLimitLease SuccessfulLease = new FixedWindowLease(true, null);
         private static readonly RateLimitLease FailedLease = new FixedWindowLease(false, null);
 
         public override TimeSpan? IdleDuration => TimeSpan.Zero;
@@ -86,10 +85,16 @@ namespace RedisRateLimiting
                 throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.PermitLimit));
             }
 
-            var database = _connectionMultiplexer.GetDatabase();
+            var leaseContext = new FixedWindowLeaseContext
+            {
+                Limit = _options.PermitLimit,
+                Window = _options.Window,
+            };
 
             var now = DateTimeOffset.UtcNow;
             var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
+
+            var database = _connectionMultiplexer.GetDatabase();
 
             var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
                 _redisScript,
@@ -101,21 +106,18 @@ namespace RedisRateLimiting
                     increment_amount = 1D,
                 });
 
-            long count = 1;
-            long expireAt = nowUnixTimeSeconds;
-
             if (response != null)
             {
-                count = (long)response[0];
-                expireAt = (long)response[1];
+                leaseContext.Count = (long)response[0];
+                leaseContext.RetryAfter = TimeSpan.FromSeconds((long)response[1] - nowUnixTimeSeconds);
             }
 
-            if (count > _options.PermitLimit)
+            if (leaseContext.Count > _options.PermitLimit)
             {
-                return new FixedWindowLease(isAcquired: false, TimeSpan.FromSeconds(expireAt - nowUnixTimeSeconds));
+                return new FixedWindowLease(isAcquired: false, leaseContext);
             }
 
-            return SuccessfulLease;
+            return new FixedWindowLease(isAcquired: true, leaseContext);
         }
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
@@ -123,16 +125,27 @@ namespace RedisRateLimiting
             return FailedLease;
         }
 
+        private sealed class FixedWindowLeaseContext
+        {
+            public long Count { get; set; }
+
+            public long Limit { get; set; }
+
+            public TimeSpan Window { get; set; }
+
+            public TimeSpan? RetryAfter { get; set; }
+        }
+
         private sealed class FixedWindowLease : RateLimitLease
         {
             private static readonly string[] s_allMetadataNames = new[] { MetadataName.RetryAfter.Name };
 
-            private readonly TimeSpan? _retryAfter;
+            private readonly FixedWindowLeaseContext? _context;
 
-            public FixedWindowLease(bool isAcquired, TimeSpan? retryAfter)
+            public FixedWindowLease(bool isAcquired, FixedWindowLeaseContext? context)
             {
                 IsAcquired = isAcquired;
-                _retryAfter = retryAfter;
+                _context = context;
             }
 
             public override bool IsAcquired { get; }
@@ -141,9 +154,21 @@ namespace RedisRateLimiting
 
             public override bool TryGetMetadata(string metadataName, out object? metadata)
             {
-                if (metadataName == MetadataName.RetryAfter.Name && _retryAfter.HasValue)
+                if (metadataName == RateLimitMetadataName.Limit.Name && _context is not null)
                 {
-                    metadata = _retryAfter.Value;
+                    metadata = _context.Limit.ToString();
+                    return true;
+                }
+
+                if (metadataName == RateLimitMetadataName.Remaining.Name && _context is not null)
+                {
+                    metadata = Math.Max(_context.Limit - _context.Count, 0);
+                    return true;
+                }
+
+                if (metadataName == RateLimitMetadataName.RetryAfter.Name && _context?.RetryAfter is not null)
+                {
+                    metadata = (int)_context.RetryAfter.Value.TotalSeconds;
                     return true;
                 }
 

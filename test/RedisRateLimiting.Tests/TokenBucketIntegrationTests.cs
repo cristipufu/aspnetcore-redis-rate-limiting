@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc.Testing;
+using RedisRateLimiting.Sample;
+using System.Net;
 using Xunit;
 
 namespace RedisRateLimiting.Tests
@@ -19,31 +21,64 @@ namespace RedisRateLimiting.Tests
         [Fact]
         public async Task GetRequestsEnforceLimit()
         {
-            using var request = new HttpRequestMessage(new HttpMethod("GET"), _apiPath);
-            using var response = await _httpClient.SendAsync(request);
-            int responseStatusCode = (int)response.StatusCode;
-            await response.Content.ReadAsStringAsync();
-            Assert.Equal(200, responseStatusCode);
+            var response = await MakeRequestAsync();
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-            using var request2 = new HttpRequestMessage(new HttpMethod("GET"), _apiPath);
-            using var response2 = await _httpClient.SendAsync(request2);
-            responseStatusCode = (int)response2.StatusCode;
-            await response2.Content.ReadAsStringAsync();
-            Assert.Equal(200, responseStatusCode);
+            response = await MakeRequestAsync();
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-            using var request3 = new HttpRequestMessage(new HttpMethod("GET"), _apiPath);
-            using var response3 = await _httpClient.SendAsync(request3);
-            responseStatusCode = (int)response3.StatusCode;
-            await response3.Content.ReadAsStringAsync();
-            Assert.Equal(429, responseStatusCode);
+            response = await MakeRequestAsync();
+            Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+            Assert.Equal(2, response.Limit);
+            Assert.Equal(0, response.Remaining);
+            //Assert.NotNull(response.RetryAfter);
 
             await Task.Delay(1000 * 2);
 
-            using var request4 = new HttpRequestMessage(new HttpMethod("GET"), _apiPath);
-            using var response4 = await _httpClient.SendAsync(request4);
-            responseStatusCode = (int)response4.StatusCode;
-            await response4.Content.ReadAsStringAsync();
-            Assert.Equal(200, responseStatusCode);
+            response = await MakeRequestAsync();
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        private async Task<RateLimitResponse> MakeRequestAsync()
+        {
+            using var request = new HttpRequestMessage(new HttpMethod("GET"), _apiPath);
+            using var response = await _httpClient.SendAsync(request);
+
+            var rateLimitResponse = new RateLimitResponse
+            {
+                StatusCode = response.StatusCode,
+            };
+
+            if (response.Headers.TryGetValues(RateLimitHeaders.Limit, out var valuesLimit)
+                && long.TryParse(valuesLimit.FirstOrDefault(), out var limit))
+            {
+                rateLimitResponse.Limit = limit;
+            }
+
+            if (response.Headers.TryGetValues(RateLimitHeaders.Remaining, out var valuesRemaining)
+                && long.TryParse(valuesRemaining.FirstOrDefault(), out var remaining))
+            {
+                rateLimitResponse.Remaining = remaining;
+            }
+
+            if (response.Headers.TryGetValues(RateLimitHeaders.RetryAfter, out var valuesRetryAfter)
+                && int.TryParse(valuesRetryAfter.FirstOrDefault(), out var retryAfter))
+            {
+                rateLimitResponse.RetryAfter = retryAfter;
+            }
+
+            return rateLimitResponse;
+        }
+
+        private sealed class RateLimitResponse
+        {
+            public HttpStatusCode StatusCode { get; set; }
+
+            public long? Limit { get; set; }
+
+            public long? Remaining { get; set; }
+
+            public int? RetryAfter { get; set; }
         }
     }
 }

@@ -70,12 +70,16 @@ namespace RedisRateLimiting
                 throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.PermitLimit));
             }
 
-            var database = _connectionMultiplexer.GetDatabase();
+            var leaseContext = new ConcurencyLeaseContext
+            {
+                Limit = _options.PermitLimit,
+                RequestId = Guid.NewGuid().ToString(),
+            };
 
             var now = DateTimeOffset.UtcNow;
             var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
 
-            var id = Guid.NewGuid().ToString();
+            var database = _connectionMultiplexer.GetDatabase();
 
             var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
                 _redisScript,
@@ -84,24 +88,23 @@ namespace RedisRateLimiting
                     permit_limit = _options.PermitLimit,
                     rate_limit_key = $"rl:{_partitionKey}",
                     current_time = nowUnixTimeSeconds,
-                    unique_id = id,
+                    unique_id = leaseContext.RequestId,
                 });
 
             bool allowed = false;
-            long count = 1;
 
             if (response != null)
             {
                 allowed = (bool)response[0];
-                count = (long)response[1];
+                leaseContext.Count = (long)response[1];
             }
 
             if (allowed)
             {
-                return new ConcurrencyLease(isAcquired: true, this, id);
+                return new ConcurrencyLease(isAcquired: true, this, leaseContext);
             }
 
-            return new ConcurrencyLease(isAcquired: false, this, id);
+            return new ConcurrencyLease(isAcquired: false, this, leaseContext);
         }
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
@@ -109,28 +112,35 @@ namespace RedisRateLimiting
             return FailedLease;
         }
 
-        private void Release(string id)
+        private void Release(ConcurencyLeaseContext leaseContext)
         {
             var database = _connectionMultiplexer.GetDatabase();
             // how to use async? if only RateLimitLease would implement IAsyncDisposable
-            database.SortedSetRemove($"rl:{_partitionKey}", id);
+            database.SortedSetRemove($"rl:{_partitionKey}", leaseContext.RequestId);
+        }
+
+        private sealed class ConcurencyLeaseContext
+        {
+            public string? RequestId { get; set; }
+
+            public long Count { get; set; }
+
+            public long Limit { get; set; }
         }
 
         private sealed class ConcurrencyLease : RateLimitLease
         {
-            private static readonly string[] s_allMetadataNames = new[] { MetadataName.ReasonPhrase.Name };
+            private static readonly string[] s_allMetadataNames = new[] { MetadataName.ReasonPhrase.Name, RateLimitMetadataName.Limit.Name, RateLimitMetadataName.Remaining.Name };
 
             private bool _disposed;
             private readonly RedisConcurrencyRateLimiter<TKey>? _limiter;
-            private readonly string? _id;
-            private readonly string? _reason;
+            private readonly ConcurencyLeaseContext? _context;
 
-            public ConcurrencyLease(bool isAcquired, RedisConcurrencyRateLimiter<TKey>? limiter, string? id, string? reason = null)
+            public ConcurrencyLease(bool isAcquired, RedisConcurrencyRateLimiter<TKey>? limiter, ConcurencyLeaseContext? context)
             {
                 IsAcquired = isAcquired;
                 _limiter = limiter;
-                _id = id;
-                _reason = reason;
+                _context = context;
             }
 
             public override bool IsAcquired { get; }
@@ -139,11 +149,18 @@ namespace RedisRateLimiting
 
             public override bool TryGetMetadata(string metadataName, out object? metadata)
             {
-                if (_reason is not null && metadataName == MetadataName.ReasonPhrase.Name)
+                if (metadataName == RateLimitMetadataName.Limit.Name && _context is not null)
                 {
-                    metadata = _reason;
+                    metadata = _context.Limit.ToString();
                     return true;
                 }
+
+                if (metadataName == RateLimitMetadataName.Remaining.Name && _context is not null)
+                {
+                    metadata = _context.Limit - _context.Count;
+                    return true;
+                }
+
                 metadata = default;
                 return false;
             }
@@ -157,9 +174,9 @@ namespace RedisRateLimiting
 
                 _disposed = true;
 
-                if (_id != null)
+                if (_context != null)
                 {
-                    _limiter?.Release(_id);
+                    _limiter?.Release(_context);
                 }
             }
         }
