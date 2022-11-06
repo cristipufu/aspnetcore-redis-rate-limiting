@@ -33,6 +33,13 @@ builder.Services.AddRateLimiter(options =>
         opt.Window = TimeSpan.FromSeconds(2);
     });
 
+    options.AddRedisSlidingWindowLimiter("demo_sliding_window", (opt) =>
+    {
+        opt.ConnectionMultiplexerFactory = () => connectionMultiplexer;
+        opt.PermitLimit = 1;
+        opt.Window = TimeSpan.FromSeconds(2);
+    });
+
     options.AddPolicy<string, ClientIdRateLimiterPolicy>("demo_client_id");
 
     options.AddPolicy("demo_client_id2", new ClientIdRateLimiterPolicy(connectionMultiplexer, NullLogger<ClientIdRateLimiterPolicy>.Instance));

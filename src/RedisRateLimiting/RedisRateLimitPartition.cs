@@ -37,6 +37,20 @@ namespace RedisRateLimiting
         }
 
         /// <summary>
+        /// Defines a partition with a <see cref="RedisSlidingWindowRateLimiter{TKey}"/> with the given <see cref="RedisSlidingWindowRateLimiterOptions"/>.
+        /// </summary>
+        /// <typeparam name="TKey">The type to distinguish partitions with.</typeparam>
+        /// <param name="partitionKey">The specific key for this partition. This will be used to check for an existing cached limiter before calling the <paramref name="factory"/>.</param>
+        /// <param name="factory">The function called when a rate limiter for the given <paramref name="partitionKey"/> is needed. This can return the same instance of <see cref="RedisSlidingWindowRateLimiterOptions"/> across different calls.</param>
+        /// <returns></returns>
+        public static RateLimitPartition<TKey> GetRedisSlidingWindowRateLimiter<TKey>(
+            TKey partitionKey,
+            Func<TKey, RedisSlidingWindowRateLimiterOptions> factory)
+        {
+            return RateLimitPartition.Get(partitionKey, key => new RedisSlidingWindowRateLimiter<TKey>(key, factory(key)));
+        }
+
+        /// <summary>
         /// Defines a partition with a <see cref="RedisTokenBucketRateLimiter{TKey}"/> with the given <see cref="RedisTokenBucketRateLimiterOptions"/>.
         /// </summary>
         /// <typeparam name="TKey">The type to distinguish partitions with.</typeparam>

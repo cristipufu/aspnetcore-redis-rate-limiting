@@ -48,6 +48,27 @@ namespace RedisRateLimiting
         }
 
         /// <summary>
+        /// Adds a new <see cref="RedisSlidingWindowRateLimiter{TKey}"/> with the given <see cref="RedisSlidingWindowRateLimiterOptions"/> to the <see cref="RateLimiterOptions"/>.
+        /// </summary>
+        /// <param name="options">The <see cref="RateLimiterOptions"/> to add a limiter to.</param>
+        /// <param name="policyName">The name that will be associated with the limiter.</param>
+        /// <param name="configureOptions">A callback to configure the <see cref="RedisSlidingWindowRateLimiterOptions"/> to be used for the limiter.</param>
+        /// <returns>This <see cref="RateLimiterOptions"/>.</returns>
+        public static RateLimiterOptions AddRedisSlidingWindowLimiter(this RateLimiterOptions options, string policyName, Action<RedisSlidingWindowRateLimiterOptions> configureOptions)
+        {
+            ArgumentNullException.ThrowIfNull(configureOptions);
+
+            var key = new PolicyNameKey() { PolicyName = policyName };
+            var slidingWindowRateLimiterOptions = new RedisSlidingWindowRateLimiterOptions();
+            configureOptions.Invoke(slidingWindowRateLimiterOptions);
+
+            return options.AddPolicy(policyName, context =>
+            {
+                return RedisRateLimitPartition.GetRedisSlidingWindowRateLimiter(key, _ => slidingWindowRateLimiterOptions);
+            });
+        }
+
+        /// <summary>
         /// Adds a new <see cref="RedisTokenBucketRateLimiter{TKey}"/> with the given <see cref="RedisTokenBucketRateLimiterOptions"/> to the <see cref="RateLimiterOptions"/>.
         /// </summary>
         /// <param name="options">The <see cref="RateLimiterOptions"/> to add a limiter to.</param>
