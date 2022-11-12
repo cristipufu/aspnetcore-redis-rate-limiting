@@ -15,7 +15,7 @@ namespace RedisRateLimiting
 
         /// <summary>
         /// Maximum number of permit counters that can be allowed in a window.
-        /// Must be set to a value > 0 by the time these options are passed to the constructor of <see cref="RedisFixedWindowRateLimiter"/>.
+        /// Must be set to a value > 0 by the time these options are passed to the constructor of <see cref="RedisFixedWindowRateLimiter{TKey}"/>.
         /// </summary>
         public int PermitLimit { get; set; }
     }

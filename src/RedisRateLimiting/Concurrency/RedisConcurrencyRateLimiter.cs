@@ -1,5 +1,7 @@
-﻿using StackExchange.Redis;
+﻿using RedisRateLimiting.Concurrency;
+using StackExchange.Redis;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.RateLimiting;
@@ -13,20 +15,11 @@ namespace RedisRateLimiting
         private readonly TKey _partitionKey;
         private readonly IConnectionMultiplexer _connectionMultiplexer;
 
-        private static readonly LuaScript _redisScript = LuaScript.Prepare(
-          @"local limit = tonumber(@permit_limit)
-            local timestamp = tonumber(@current_time)
-            local ttl = 60
+        private readonly ConcurrentQueue<Request> _queue = new();
 
-            redis.call(""zremrangebyscore"", @rate_limit_key, '-inf', timestamp - ttl)
-            local count = redis.call(""zcard"", @rate_limit_key)
-            local allowed = count < limit
-
-            if allowed then
-                redis.call(""zadd"", @rate_limit_key, timestamp, @unique_id)
-            end
-
-            return { allowed, count }");
+        private bool _disposed;
+        private readonly PeriodicTimer? _periodicTimer;
+        private readonly CancellationTokenSource? _periodicTimerCts;
 
         private static readonly ConcurrencyLease FailedLease = new(false, null, null);
 
@@ -53,9 +46,18 @@ namespace RedisRateLimiting
             {
                 ConnectionMultiplexerFactory = options.ConnectionMultiplexerFactory,
                 PermitLimit = options.PermitLimit,
+                QueueLimit = options.QueueLimit,
             };
 
             _connectionMultiplexer = _options.ConnectionMultiplexerFactory();
+
+            if (_options.QueueLimit > 0)
+            {
+                _periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+                _periodicTimerCts = new CancellationTokenSource();
+
+                _ = Task.Run(() => TryDequeueRequestsAsync(_periodicTimerCts.Token), _periodicTimerCts.Token);
+            }
         }
 
         public override RateLimiterStatistics? GetStatistics()
@@ -76,32 +78,37 @@ namespace RedisRateLimiting
                 RequestId = Guid.NewGuid().ToString(),
             };
 
-            var now = DateTimeOffset.UtcNow;
-            var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
+            var response = await _connectionMultiplexer.ExecuteConcurrencyScriptAsync(
+                GetRedisTryQueueRequest(leaseContext.RequestId));
 
-            var database = _connectionMultiplexer.GetDatabase();
+            leaseContext.Count = response.Count;
 
-            var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
-                _redisScript,
-                new
-                {
-                    permit_limit = _options.PermitLimit,
-                    rate_limit_key = $"rl:{_partitionKey}",
-                    current_time = nowUnixTimeSeconds,
-                    unique_id = leaseContext.RequestId,
-                });
-
-            bool allowed = false;
-
-            if (response != null)
-            {
-                allowed = (bool)response[0];
-                leaseContext.Count = (long)response[1];
-            }
-
-            if (allowed)
+            if (response.Allowed)
             {
                 return new ConcurrencyLease(isAcquired: true, this, leaseContext);
+            }
+
+            if (response.Queued)
+            {
+                Request request = new()
+                {
+                    LeaseContext = leaseContext,
+                    TaskCompletionSource = new TaskCompletionSource<RateLimitLease>(),
+                };
+
+                if (cancellationToken.CanBeCanceled)
+                {
+                    request.CancellationTokenRegistration = cancellationToken.Register(static obj =>
+                    {
+                        // When the request gets canceled
+                        ((TaskCompletionSource<RateLimitLease>)obj!).TrySetCanceled();
+
+                    }, request.TaskCompletionSource);
+                }
+
+                _queue.Enqueue(request);
+
+                return await request.TaskCompletionSource.Task;
             }
 
             return new ConcurrencyLease(isAcquired: false, this, leaseContext);
@@ -109,14 +116,149 @@ namespace RedisRateLimiting
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
         {
-            return FailedLease;
+            if (permitCount > _options.PermitLimit)
+            {
+                throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.PermitLimit));
+            }
+
+            var leaseContext = new ConcurencyLeaseContext
+            {
+                Limit = _options.PermitLimit,
+                RequestId = Guid.NewGuid().ToString(),
+            };
+
+            var response = _connectionMultiplexer.ExecuteConcurrencyScript(
+                GetRedisRequest(leaseContext.RequestId));
+
+            leaseContext.Count = response.Count;
+
+            if (response.Allowed)
+            {
+                return new ConcurrencyLease(isAcquired: true, this, leaseContext);
+            }
+
+            return new ConcurrencyLease(isAcquired: false, this, leaseContext);
         }
 
         private void Release(ConcurencyLeaseContext leaseContext)
         {
             var database = _connectionMultiplexer.GetDatabase();
-            // how to use async? if only RateLimitLease would implement IAsyncDisposable
-            database.SortedSetRemove($"rl:{_partitionKey}", leaseContext.RequestId);
+            database.SortedSetRemove(GetRateLimitKey(), leaseContext.RequestId);
+        }
+
+        private async Task TryDequeueRequestsAsync(CancellationToken ct)
+        {
+            if (_periodicTimer == null)
+            {
+                return;
+            }
+
+            while (await _periodicTimer.WaitForNextTickAsync(ct))
+            {
+                if (ct.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                var database = _connectionMultiplexer.GetDatabase();
+
+                while (_queue.TryPeek(out var request))
+                {
+                    if (request == null ||
+                        request.TaskCompletionSource == null ||
+                        request.LeaseContext?.RequestId == null)
+                    {
+                        _queue.TryDequeue(out _);
+
+                        continue;
+                    }
+
+                    if (request.TaskCompletionSource.Task.IsCompleted)
+                    {
+                        database.SortedSetRemove(GetQueueRateLimitKey(), request.LeaseContext.RequestId);
+                        _queue.TryDequeue(out _);
+
+                        continue;
+                    }
+
+                    var response = await _connectionMultiplexer.ExecuteConcurrencyScriptAsync(
+                        GetRedisRequest(request.LeaseContext.RequestId));
+
+                    request.LeaseContext.Count = response.Count;
+
+                    if (response.Allowed)
+                    {
+                        var pendingLease = new ConcurrencyLease(isAcquired: true, this, request.LeaseContext);
+
+                        if (request.TaskCompletionSource?.TrySetResult(pendingLease) == false)
+                        {
+                            // If the request was canceled
+                            database.SortedSetRemove(GetRateLimitKey(), request.LeaseContext.RequestId);
+                        }
+
+                        request.CancellationTokenRegistration.Dispose();
+
+                        _queue.TryDequeue(out _);
+                    }
+                    else
+                    {
+                        // Try next time
+                        break;
+                    }
+                }
+            }
+        }
+
+        private RedisConcurrencyScriptRequest GetRedisRequest(string requestId) => new RedisConcurrencyScriptRequest
+        {
+            PartitionKey = GetRateLimitKey(),
+            QueueKey = GetQueueRateLimitKey(),
+            PermitLimit = _options.PermitLimit,
+            QueueLimit = 0,
+            RequestId = requestId,
+        };
+
+        private RedisConcurrencyScriptRequest GetRedisTryQueueRequest(string requestId) => new RedisConcurrencyScriptRequest
+        {
+            PartitionKey = GetRateLimitKey(),
+            QueueKey = GetQueueRateLimitKey(),
+            PermitLimit = _options.PermitLimit,
+            QueueLimit = _options.QueueLimit,
+            RequestId = requestId,
+        };
+
+        private string GetRateLimitKey() => $"rl:{_partitionKey}";
+        private string GetQueueRateLimitKey() => $"rl:{_partitionKey}:q";
+
+        protected override void Dispose(bool disposing)
+        {
+            if (!disposing)
+            {
+                return;
+            }
+
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+
+            _periodicTimerCts?.Dispose();
+            _periodicTimer?.Dispose();
+
+            while (_queue.TryDequeue(out var request))
+            {
+                request?.CancellationTokenRegistration.Dispose();
+                request?.TaskCompletionSource?.TrySetResult(FailedLease);
+            }
+        }
+
+        protected override ValueTask DisposeAsyncCore()
+        {
+            Dispose(true);
+
+            return default;
         }
 
         private sealed class ConcurencyLeaseContext
@@ -179,6 +321,15 @@ namespace RedisRateLimiting
                     _limiter?.Release(_context);
                 }
             }
+        }
+
+        private sealed class Request
+        {
+            public ConcurencyLeaseContext? LeaseContext { get; set; }
+
+            public TaskCompletionSource<RateLimitLease>? TaskCompletionSource { get; set; }
+
+            public CancellationTokenRegistration CancellationTokenRegistration { get; set; }
         }
     }
 }

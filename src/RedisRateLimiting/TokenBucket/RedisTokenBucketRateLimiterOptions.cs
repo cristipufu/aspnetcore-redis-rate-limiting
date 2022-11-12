@@ -15,13 +15,13 @@ namespace RedisRateLimiting
 
         /// <summary>
         /// Specifies the maximum number of tokens to restore each replenishment.
-        /// Must be set to a value > 0 by the time these options are passed to the constructor of <see cref="RedisTokenBucketRateLimiter"/>.
+        /// Must be set to a value > 0 by the time these options are passed to the constructor of <see cref="RedisTokenBucketRateLimiter{TKey}"/>.
         /// </summary>
         public int TokensPerPeriod { get; set; }
 
         /// <summary>
         /// Maximum number of tokens that can be in the bucket at any time.
-        /// Must be set to a value > 0 by the time these options are passed to the constructor of <see cref="RedisTokenBucketRateLimiter"/>.
+        /// Must be set to a value > 0 by the time these options are passed to the constructor of <see cref="RedisTokenBucketRateLimiter{TKey}"/>.
         /// </summary>
         public int TokenLimit { get; set; }
     }
