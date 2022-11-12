@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc.Testing;
-using RedisRateLimiting.Sample;
+using RedisRateLimiting.AspNetCore;
 using System.Net;
 using Xunit;
 
@@ -30,7 +30,7 @@ namespace RedisRateLimiting.Tests
             Assert.Equal(0, response.Remaining);
             Assert.NotNull(response.RetryAfter);
 
-            await Task.Delay(1000 * response.RetryAfter.Value);
+            await Task.Delay(1000 * (response.RetryAfter.Value + 1));
 
             response = await MakeRequestAsync();
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);

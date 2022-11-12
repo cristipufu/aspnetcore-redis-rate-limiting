@@ -1,4 +1,4 @@
-﻿namespace RedisRateLimiting.Sample
+﻿namespace RedisRateLimiting.AspNetCore
 {
     public class RateLimitHeaders
     {

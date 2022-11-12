@@ -11,6 +11,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\src\RedisRateLimiting.AspNetCore\RedisRateLimiting.AspNetCore.csproj" />
 		<ProjectReference Include="..\..\src\RedisRateLimiting\RedisRateLimiting.csproj" />
 	</ItemGroup>
 

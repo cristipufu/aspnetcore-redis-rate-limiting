@@ -1,4 +1,4 @@
-﻿namespace RedisRateLimiting
+﻿namespace RedisRateLimiting.AspNetCore
 {
     internal sealed class PolicyNameKey
     {

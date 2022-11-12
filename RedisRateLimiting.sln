@@ -7,11 +7,13 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{F267466D-709
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{D6A4A9C6-F4BD-47A0-A6BC-CE262559E5C6}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RedisRateLimiting.Sample", "test\RedisRateLimiting.Sample\RedisRateLimiting.Sample.csproj", "{5BE4A3E4-9F05-4098-A2A9-FE76CE17BCA6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RedisRateLimiting.Sample.AspNetCore", "test\RedisRateLimiting.Sample.AspNetCore\RedisRateLimiting.Sample.AspNetCore.csproj", "{5BE4A3E4-9F05-4098-A2A9-FE76CE17BCA6}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RedisRateLimiting", "src\RedisRateLimiting\RedisRateLimiting.csproj", "{A2505BC2-92D6-42B1-8B2A-3272F02C1EAF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisRateLimiting.Tests", "test\RedisRateLimiting.Tests\RedisRateLimiting.Tests.csproj", "{5C0B495C-5C21-4624-8883-720BEC63B8B2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RedisRateLimiting.Tests", "test\RedisRateLimiting.Tests\RedisRateLimiting.Tests.csproj", "{5C0B495C-5C21-4624-8883-720BEC63B8B2}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RedisRateLimiting.AspNetCore", "src\RedisRateLimiting.AspNetCore\RedisRateLimiting.AspNetCore.csproj", "{EF9062B1-D1CB-416D-AB9D-D92956C4921F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -31,6 +33,10 @@ Global
 		{5C0B495C-5C21-4624-8883-720BEC63B8B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5C0B495C-5C21-4624-8883-720BEC63B8B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5C0B495C-5C21-4624-8883-720BEC63B8B2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EF9062B1-D1CB-416D-AB9D-D92956C4921F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EF9062B1-D1CB-416D-AB9D-D92956C4921F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EF9062B1-D1CB-416D-AB9D-D92956C4921F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EF9062B1-D1CB-416D-AB9D-D92956C4921F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -39,6 +45,7 @@ Global
 		{5BE4A3E4-9F05-4098-A2A9-FE76CE17BCA6} = {D6A4A9C6-F4BD-47A0-A6BC-CE262559E5C6}
 		{A2505BC2-92D6-42B1-8B2A-3272F02C1EAF} = {F267466D-709D-4CC4-9FC7-7DF4C212FC3E}
 		{5C0B495C-5C21-4624-8883-720BEC63B8B2} = {D6A4A9C6-F4BD-47A0-A6BC-CE262559E5C6}
+		{EF9062B1-D1CB-416D-AB9D-D92956C4921F} = {F267466D-709D-4CC4-9FC7-7DF4C212FC3E}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {C4DA8CE4-B0F4-4ACF-A961-1F1A354B6B89}

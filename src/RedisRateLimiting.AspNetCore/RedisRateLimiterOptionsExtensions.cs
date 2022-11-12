@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.RateLimiting;
 using System;
 
-namespace RedisRateLimiting
+namespace RedisRateLimiting.AspNetCore
 {
     public static class RedisRateLimiterOptionsExtensions
     {

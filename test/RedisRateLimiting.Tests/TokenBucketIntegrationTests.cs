@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc.Testing;
-using RedisRateLimiting.Sample;
+using RedisRateLimiting.AspNetCore;
 using System.Net;
 using Xunit;
 

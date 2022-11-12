@@ -27,7 +27,7 @@ namespace RedisRateLimiting
 
         /// <summary>
         /// The remaining window before the rate limit resets in seconds.
-        /// For example, used in <see cref="RedisConcurrencyRateLimiter{TKey}"/>.
+        /// For example, used in <see cref="RedisFixedWindowRateLimiter{TKey}"/>.
         /// </summary>
         public static MetadataName<long> Reset { get; } = MetadataName.Create<long>("RATELIMIT_RESET");
     }

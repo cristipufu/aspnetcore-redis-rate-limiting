@@ -18,7 +18,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.AspNetCore.RateLimiting" Version="7.0.0-rc.2.22476.2" />
+		<PackageReference Include="System.Threading.RateLimiting" Version="7.0.0" />
 		<PackageReference Include="StackExchange.Redis" Version="2.6.70" />
 	</ItemGroup>
 
