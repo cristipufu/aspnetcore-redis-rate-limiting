@@ -10,6 +10,7 @@ namespace RedisRateLimiting.Tests
     {
         private readonly HttpClient _httpClient;
         private readonly string _apiPath = "/concurrency";
+        private readonly string _apiPathQueue = "/concurrency/queue";
 
         public ConcurrencyIntegrationTests(WebApplicationFactory<Program> factory)
         {
@@ -26,7 +27,7 @@ namespace RedisRateLimiting.Tests
 
             for (var i = 0; i < 5; i++)
             {
-                tasks.Add(MakeRequestAsync());
+                tasks.Add(MakeRequestAsync(_apiPath));
             }
 
             await Task.WhenAll(tasks);
@@ -37,7 +38,7 @@ namespace RedisRateLimiting.Tests
 
             await Task.Delay(1000);
 
-            var response = await MakeRequestAsync();
+            var response = await MakeRequestAsync(_apiPath);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
             // Find a way to send rate limit headers when request is successful as well
@@ -45,9 +46,24 @@ namespace RedisRateLimiting.Tests
             Assert.Null(response.Remaining);
         }
 
-        private async Task<RateLimitResponse> MakeRequestAsync()
+        [Fact]
+        public async Task GetQueuedRequests()
         {
-            using var request = new HttpRequestMessage(new HttpMethod("GET"), _apiPath);
+            var tasks = new List<Task<RateLimitResponse>>();
+
+            for (var i = 0; i < 5; i++)
+            {
+                tasks.Add(MakeRequestAsync(_apiPathQueue));
+            }
+
+            await Task.WhenAll(tasks);
+
+            Assert.Equal(5, tasks.Count(x => x.Result.StatusCode == HttpStatusCode.OK));
+        }
+
+        private async Task<RateLimitResponse> MakeRequestAsync(string path)
+        {
+            using var request = new HttpRequestMessage(new HttpMethod("GET"), path);
             using var response = await _httpClient.SendAsync(request);
 
             var rateLimitResponse = new RateLimitResponse

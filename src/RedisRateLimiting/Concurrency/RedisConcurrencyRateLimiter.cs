@@ -165,51 +165,63 @@ namespace RedisRateLimiting
                     break;
                 }
 
-                var database = _connectionMultiplexer.GetDatabase();
-
-                while (_queue.TryPeek(out var request))
+                if (!_connectionMultiplexer.IsConnected)
                 {
-                    if (request == null ||
-                        request.TaskCompletionSource == null ||
-                        request.LeaseContext?.RequestId == null)
+                    continue;
+                }
+
+                try
+                {
+                    var database = _connectionMultiplexer.GetDatabase();
+
+                    while (_queue.TryPeek(out var request))
                     {
-                        _queue.TryDequeue(out _);
-
-                        continue;
-                    }
-
-                    if (request.TaskCompletionSource.Task.IsCompleted)
-                    {
-                        database.SortedSetRemove(QueueRateLimitKey, request.LeaseContext.RequestId);
-                        _queue.TryDequeue(out _);
-
-                        continue;
-                    }
-
-                    var response = await _connectionMultiplexer.ExecuteConcurrencyScriptAsync(
-                        GetRedisRequest(request.LeaseContext.RequestId));
-
-                    request.LeaseContext.Count = response.Count;
-
-                    if (response.Allowed)
-                    {
-                        var pendingLease = new ConcurrencyLease(isAcquired: true, this, request.LeaseContext);
-
-                        if (request.TaskCompletionSource?.TrySetResult(pendingLease) == false)
+                        if (request == null ||
+                            request.TaskCompletionSource == null ||
+                            request.LeaseContext?.RequestId == null)
                         {
-                            // If the request was canceled
-                            database.SortedSetRemove(RateLimitKey, request.LeaseContext.RequestId);
+                            _queue.TryDequeue(out _);
+
+                            continue;
                         }
 
-                        request.CancellationTokenRegistration.Dispose();
+                        if (request.TaskCompletionSource.Task.IsCompleted)
+                        {
+                            await database.SortedSetRemoveAsync(QueueRateLimitKey, request.LeaseContext.RequestId);
+                            _queue.TryDequeue(out _);
 
-                        _queue.TryDequeue(out _);
+                            continue;
+                        }
+
+                        var response = await _connectionMultiplexer.ExecuteConcurrencyScriptAsync(
+                            GetRedisRequest(request.LeaseContext.RequestId));
+
+                        request.LeaseContext.Count = response.Count;
+
+                        if (response.Allowed)
+                        {
+                            var pendingLease = new ConcurrencyLease(isAcquired: true, this, request.LeaseContext);
+
+                            request.CancellationTokenRegistration.Dispose();
+
+                            _queue.TryDequeue(out _);
+
+                            if (request.TaskCompletionSource?.TrySetResult(pendingLease) == false)
+                            {
+                                // If the request was canceled
+                                await database.SortedSetRemoveAsync(RateLimitKey, request.LeaseContext.RequestId);
+                            }
+                        }
+                        else
+                        {
+                            // Try next time
+                            break;
+                        }
                     }
-                    else
-                    {
-                        // Try next time
-                        break;
-                    }
+                }
+                catch
+                {
+                    // 
                 }
             }
         }

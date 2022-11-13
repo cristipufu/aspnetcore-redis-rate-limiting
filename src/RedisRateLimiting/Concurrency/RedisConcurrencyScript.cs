@@ -10,6 +10,7 @@ namespace RedisRateLimiting.Concurrency
           @"local limit = tonumber(@permit_limit)
             local queue_limit = tonumber(@queue_limit)
             local timestamp = tonumber(@current_time)
+            -- max seconds it takes to complete a request
             local ttl = 60
 
             redis.call(""zremrangebyscore"", @rate_limit_key, '-inf', timestamp - ttl)

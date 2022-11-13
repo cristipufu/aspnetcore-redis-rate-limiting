@@ -12,6 +12,13 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp => connectionMultiplexe
 
 builder.Services.AddRateLimiter(options =>
 {
+    options.AddRedisConcurrencyLimiter("demo_concurrency_queue", (opt) =>
+    {
+        opt.ConnectionMultiplexerFactory = () => connectionMultiplexer;
+        opt.PermitLimit = 2;
+        opt.QueueLimit = 3;
+    });
+
     options.AddRedisConcurrencyLimiter("demo_concurrency", (opt) =>
     {
         opt.ConnectionMultiplexerFactory = () => connectionMultiplexer;
