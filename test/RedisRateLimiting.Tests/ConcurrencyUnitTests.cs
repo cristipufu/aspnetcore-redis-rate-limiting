@@ -1,6 +1,5 @@
-﻿using Xunit;
-using StackExchange.Redis;
-using System.Threading.RateLimiting;
+﻿using StackExchange.Redis;
+using Xunit;
 
 namespace RedisRateLimiting.Tests
 {
@@ -27,6 +26,23 @@ namespace RedisRateLimiting.Tests
                     PermitLimit = 1,
                     ConnectionMultiplexerFactory = null,
                 }));
+        }
+
+        [Fact]
+        public async Task ThrowsWhenAcquiringMoreThanLimit()
+        {
+            var limiter = new RedisConcurrencyRateLimiter<string>(
+                string.Empty,
+                new RedisConcurrencyRateLimiterOptions
+                {
+                    PermitLimit = 1,
+                    QueueLimit = 1,
+                    ConnectionMultiplexerFactory = GetRedisInstance
+                });
+            var ex = Assert.Throws<ArgumentOutOfRangeException>(() => limiter.AttemptAcquire(2));
+            Assert.Equal("permitCount", ex.ParamName);
+            ex = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await limiter.AcquireAsync(2));
+            Assert.Equal("permitCount", ex.ParamName);
         }
 
         [Fact]
@@ -81,10 +97,10 @@ namespace RedisRateLimiting.Tests
         }
 
         [Fact]
-        public async Task CanAcquireResourceAsync_QueuesAndGrabsOldest()
+        public async Task CanAcquireResourceAsyncQueuesAndGrabsOldest()
         {
             using var limiter = new RedisConcurrencyRateLimiter<string>(
-                "Test_CanAcquireResourceAsync_QueuesAndGrabsOldest",
+                "Test_CanAcquireResourceAsyncQueuesAndGrabsOldest",
                 new RedisConcurrencyRateLimiterOptions
                 {
                     PermitLimit = 1,
@@ -114,11 +130,90 @@ namespace RedisRateLimiting.Tests
             lease.Dispose();
         }
 
+        [Fact]
+        public async Task FailsWhenQueuingMoreThanLimit()
+        {
+            using var limiter = new RedisConcurrencyRateLimiter<string>(
+                "Test_FailsWhenQueuingMoreThanLimit",
+                new RedisConcurrencyRateLimiterOptions
+                {
+                    PermitLimit = 1,
+                    QueueLimit = 1,
+                    ConnectionMultiplexerFactory = GetRedisInstance,
+                });
+
+            using var lease = limiter.AttemptAcquire();
+            var wait = limiter.AcquireAsync();
+
+            var failedLease = await limiter.AcquireAsync();
+            Assert.False(failedLease.IsAcquired);
+        }
+
+        [Fact]
+        public async Task QueueAvailableAfterQueueLimitHitAndResourcesBecomeAvailable()
+        {
+            using var limiter = new RedisConcurrencyRateLimiter<string>(
+                "Test_QueueAvailableAfterQueueLimitHitAndResourcesBecomeAvailable",
+                new RedisConcurrencyRateLimiterOptions
+                {
+                    PermitLimit = 1,
+                    QueueLimit = 1,
+                    ConnectionMultiplexerFactory = GetRedisInstance,
+                });
+           
+            var lease = limiter.AttemptAcquire();
+            var wait = limiter.AcquireAsync();
+
+            var failedLease = await limiter.AcquireAsync();
+            Assert.False(failedLease.IsAcquired);
+
+            lease.Dispose();
+            lease = await wait;
+            Assert.True(lease.IsAcquired);
+
+            wait = limiter.AcquireAsync();
+            Assert.False(wait.IsCompleted);
+
+            lease.Dispose();
+            lease = await wait;
+            Assert.True(lease.IsAcquired);
+            lease.Dispose();
+        }
+
+        [Fact]
+        public async Task CanDequeueMultipleResourcesAtOnce()
+        {
+            using var limiter = new RedisConcurrencyRateLimiter<string>(
+                "Test_CanDequeueMultipleResourcesAtOnce",
+                new RedisConcurrencyRateLimiterOptions
+                {
+                    PermitLimit = 2,
+                    QueueLimit = 2,
+                    ConnectionMultiplexerFactory = GetRedisInstance,
+                });
+            using var lease = await limiter.AcquireAsync();
+            Assert.True(lease.IsAcquired);
+            using var leaseNew = await limiter.AcquireAsync();
+            Assert.True(leaseNew.IsAcquired);
+
+            var wait1 = limiter.AcquireAsync();
+            var wait2 = limiter.AcquireAsync();
+            Assert.False(wait1.IsCompleted);
+            Assert.False(wait2.IsCompleted);
+
+            lease.Dispose();
+            leaseNew.Dispose();
+
+            using var lease1 = await wait1;
+            using var lease2 = await wait2;
+            Assert.True(lease1.IsAcquired);
+            Assert.True(lease2.IsAcquired);
+        }
+
         private IConnectionMultiplexer GetRedisInstance()
         {
             var redisOptions = ConfigurationOptions.Parse(",ssl=True,abortConnect=False");
             return ConnectionMultiplexer.Connect(redisOptions);
         }
-
     }
 }
