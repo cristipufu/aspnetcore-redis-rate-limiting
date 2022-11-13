@@ -11,15 +11,18 @@ namespace RedisRateLimiting
 {
     public class RedisConcurrencyRateLimiter<TKey> : RateLimiter
     {
-        private readonly RedisConcurrencyRateLimiterOptions _options;
-        private readonly TKey _partitionKey;
-        private readonly IConnectionMultiplexer _connectionMultiplexer;
+        private readonly TKey PartitionKey;
+        private readonly string RateLimitKey;
+        private readonly string QueueRateLimitKey;
 
+        private readonly RedisConcurrencyRateLimiterOptions _options;
+        private readonly IConnectionMultiplexer _connectionMultiplexer;
         private readonly ConcurrentQueue<Request> _queue = new();
 
-        private bool _disposed;
         private readonly PeriodicTimer? _periodicTimer;
         private readonly CancellationTokenSource? _periodicTimerCts;
+
+        private bool _disposed;
 
         private static readonly ConcurrencyLease FailedLease = new(false, null, null);
 
@@ -40,7 +43,9 @@ namespace RedisRateLimiting
                 throw new ArgumentException(string.Format("{0} must not be null.", nameof(options.ConnectionMultiplexerFactory)), nameof(options));
             }
 
-            _partitionKey = partitionKey;
+            PartitionKey = partitionKey;
+            RateLimitKey = $"rl:{partitionKey}";
+            QueueRateLimitKey = $"rl:{partitionKey}:q";
 
             _options = new RedisConcurrencyRateLimiterOptions
             {
@@ -143,7 +148,7 @@ namespace RedisRateLimiting
         private void Release(ConcurencyLeaseContext leaseContext)
         {
             var database = _connectionMultiplexer.GetDatabase();
-            database.SortedSetRemove(GetRateLimitKey(), leaseContext.RequestId);
+            database.SortedSetRemove(RateLimitKey, leaseContext.RequestId);
         }
 
         private async Task TryDequeueRequestsAsync(CancellationToken ct)
@@ -175,7 +180,7 @@ namespace RedisRateLimiting
 
                     if (request.TaskCompletionSource.Task.IsCompleted)
                     {
-                        database.SortedSetRemove(GetQueueRateLimitKey(), request.LeaseContext.RequestId);
+                        database.SortedSetRemove(QueueRateLimitKey, request.LeaseContext.RequestId);
                         _queue.TryDequeue(out _);
 
                         continue;
@@ -193,7 +198,7 @@ namespace RedisRateLimiting
                         if (request.TaskCompletionSource?.TrySetResult(pendingLease) == false)
                         {
                             // If the request was canceled
-                            database.SortedSetRemove(GetRateLimitKey(), request.LeaseContext.RequestId);
+                            database.SortedSetRemove(RateLimitKey, request.LeaseContext.RequestId);
                         }
 
                         request.CancellationTokenRegistration.Dispose();
@@ -211,8 +216,8 @@ namespace RedisRateLimiting
 
         private RedisConcurrencyScriptRequest GetRedisRequest(string requestId) => new RedisConcurrencyScriptRequest
         {
-            PartitionKey = GetRateLimitKey(),
-            QueueKey = GetQueueRateLimitKey(),
+            PartitionKey = RateLimitKey,
+            QueueKey = QueueRateLimitKey,
             PermitLimit = _options.PermitLimit,
             QueueLimit = 0,
             RequestId = requestId,
@@ -220,15 +225,12 @@ namespace RedisRateLimiting
 
         private RedisConcurrencyScriptRequest GetRedisTryQueueRequest(string requestId) => new RedisConcurrencyScriptRequest
         {
-            PartitionKey = GetRateLimitKey(),
-            QueueKey = GetQueueRateLimitKey(),
+            PartitionKey = RateLimitKey,
+            QueueKey = QueueRateLimitKey,
             PermitLimit = _options.PermitLimit,
             QueueLimit = _options.QueueLimit,
             RequestId = requestId,
         };
-
-        private string GetRateLimitKey() => $"rl:{_partitionKey}";
-        private string GetQueueRateLimitKey() => $"rl:{_partitionKey}:q";
 
         protected override void Dispose(bool disposing)
         {
