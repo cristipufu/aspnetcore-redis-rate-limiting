@@ -31,16 +31,23 @@ Instead of "You can use our API 1000 times per second", this rate limiting strat
 <br>
 
 You can use a new instance of the [RedisConcurrencyRateLimiter](https://github.com/cristipufu/aspnetcore-redis-rate-limiting/blob/master/src/RedisRateLimiting/Concurrency/RedisConcurrencyRateLimiter.cs) class or configure the predefined extension method:
+
 ```C#
 builder.Services.AddRateLimiter(options =>
 {
     options.AddRedisConcurrencyLimiter("demo_concurrency", (opt) =>
     {
         opt.ConnectionMultiplexerFactory = () => connectionMultiplexer;
-        opt.PermitLimit = 2;
+        opt.PermitLimit = 5;
+        // Queue requests when the limit is reached
+        //opt.QueueLimit = 5 
     });
 });
 ```
+
+<br>
+
+![concurrent_queuing_requests](https://user-images.githubusercontent.com/3955285/201516823-f0413ad7-de83-4393-acd7-a2f7c8c1e359.gif)
 
 <br>
 
