@@ -1,11 +1,14 @@
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.EntityFrameworkCore;
 using RedisRateLimiting.AspNetCore;
+using RedisRateLimiting.Sample.AspNetCore.Database;
 using RedisRateLimiting.Sample.Samples;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var redisOptions = ConfigurationOptions.Parse(",ssl=True,abortConnect=False");
+builder.Services.AddDbContext<SampleDbContext>();
+
+var redisOptions = ConfigurationOptions.Parse(builder.Configuration.GetConnectionString("Redis")!);
 var connectionMultiplexer = ConnectionMultiplexer.Connect(redisOptions);
 
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp => connectionMultiplexer);
@@ -49,8 +52,6 @@ builder.Services.AddRateLimiter(options =>
 
     options.AddPolicy<string, ClientIdRateLimiterPolicy>("demo_client_id");
 
-    options.AddPolicy("demo_client_id2", new ClientIdRateLimiterPolicy(connectionMultiplexer, NullLogger<ClientIdRateLimiterPolicy>.Instance));
-
     options.OnRejected = (context, ct) => RateLimitMetadata.OnRejected(context.HttpContext, context.Lease, ct);
 });
 
@@ -71,8 +72,13 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
-
 app.MapControllers();
+
+
+var scope = app.Services.CreateScope();
+var dbContext = scope.ServiceProvider.GetRequiredService<SampleDbContext>();
+dbContext.Database.Migrate();
+scope.Dispose();
 
 app.Run();
 
