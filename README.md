@@ -109,41 +109,13 @@ builder.Services.AddRateLimiter(options =>
 <br>
 
 ## snippets
-```C#
-var redisOptions = ConfigurationOptions.Parse(",ssl=True,abortConnect=False");
-var connectionMultiplexer = ConnectionMultiplexer.Connect(redisOptions);
 
-builder.Services.AddRateLimiter(options =>
-{
-    options.AddRedisConcurrencyLimiter("demo_concurrency", (opt) =>
-    {
-        opt.ConnectionMultiplexerFactory = () => connectionMultiplexer;
-        opt.PermitLimit = 2;
-    });
+These samples intentionally keep things simple for clarity.
 
-    options.AddRedisTokenBucketLimiter("demo_token_bucket", (opt) =>
-    {
-        opt.ConnectionMultiplexerFactory = () => connectionMultiplexer;
-        opt.TokenLimit = 2;
-        opt.TokensPerPeriod = 1;
-        opt.ReplenishmentPeriod = TimeSpan.FromSeconds(2);
-    });
+- [Custom Rate Limiting Policies](https://github.com/cristipufu/aspnetcore-redis-rate-limiting/wiki/Custom-Rate-Limiting-Policies)
+- [Rate Limiting Headers](https://github.com/cristipufu/aspnetcore-redis-rate-limiting/wiki/Rate-Limiting-Headers)
 
-    options.AddRedisFixedWindowLimiter("demo_fixed_window", (opt) =>
-    {
-        opt.ConnectionMultiplexerFactory = () => connectionMultiplexer;
-        opt.PermitLimit = 1;
-        opt.Window = TimeSpan.FromSeconds(2);
-    });
-
-    options.OnRejected = (context, token) =>
-    {
-        context.HttpContext.Response.StatusCode = 429;
-        return ValueTask.CompletedTask;
-    };
-});
-```
-
+<br>
 
 ---
 
