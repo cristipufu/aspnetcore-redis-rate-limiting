@@ -1,15 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.RateLimiting" Version="7.0.0-rc.2.22476.2" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\RedisRateLimiting\RedisRateLimiting.csproj" />
-  </ItemGroup>
+	<PropertyGroup>
+		<OutputType>Library</OutputType>
+		<TargetFramework>net7.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<RootNamespace>RedisRateLimiting.AspNetCore</RootNamespace>
+		<Description>AspNetCore Redis extension for .NET 7.0 rate limiting</Description>
+		<Authors>Cristi Pufu</Authors>
+		<AssemblyName>RedisRateLimiting.AspNetCore</AssemblyName>
+		<PackageId>RedisRateLimiting.AspNetCore</PackageId>
+		<PackageTags>redis;rate-limit;rate-limiting;rate-limiter;aspnetcore;net7</PackageTags>
+		<PackageProjectUrl>https://github.com/cristipufu/aspnetcore-redis-rate-limiting</PackageProjectUrl>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<RepositoryType>git</RepositoryType>
+		<RepositoryUrl>https://github.com/cristipufu/aspnetcore-redis-rate-limiting</RepositoryUrl>
+		<Version>1.0.0</Version>
+		<ImplicitUsings>enable</ImplicitUsings>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.RateLimiting" Version="7.0.0-rc.2.22476.2" />
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\RedisRateLimiting\RedisRateLimiting.csproj" />
+	</ItemGroup>
 
 </Project>

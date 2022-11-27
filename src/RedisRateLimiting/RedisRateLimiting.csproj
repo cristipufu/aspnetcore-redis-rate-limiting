@@ -5,7 +5,7 @@
 		<TargetFramework>net7.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<RootNamespace>RedisRateLimiting</RootNamespace>
-		<Description>AspNetCore Redis extension for .NET 7.0 rate limiting</Description>
+		<Description>Redis extensions for .NET 7.0 rate limiting</Description>
 		<Authors>Cristi Pufu</Authors>
 		<AssemblyName>RedisRateLimiting</AssemblyName>
 		<PackageId>RedisRateLimiting</PackageId>

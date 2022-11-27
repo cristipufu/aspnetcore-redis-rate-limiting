@@ -75,7 +75,7 @@ namespace RedisRateLimiting
                 RequestId = Guid.NewGuid().ToString(),
             };
 
-            var response = await _redisManager.TryAcquireLeaseAsync(leaseContext.RequestId, tryQueueing: true);
+            var response = await _redisManager.TryAcquireLeaseAsync(leaseContext.RequestId, tryEnqueue: true);
 
             leaseContext.Count = response.Count;
 

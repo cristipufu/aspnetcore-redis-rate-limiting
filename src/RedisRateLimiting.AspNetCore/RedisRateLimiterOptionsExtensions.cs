@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.RateLimiting;
-using System;
 
 namespace RedisRateLimiting.AspNetCore
 {
