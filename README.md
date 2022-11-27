@@ -9,7 +9,8 @@ For more advanced use cases you can check out the [official documentation here](
 
 # install
 
-[![NuGet](https://img.shields.io/nuget/v/RedisRateLimiting)](https://www.nuget.org/packages/RedisRateLimiting) 
+[![NuGet](https://img.shields.io/nuget/v/RedisRateLimiting)](https://www.nuget.org/packages/RedisRateLimiting) [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcristipufu%2Faspnetcore-redis-rate-limiting.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fcristipufu%2Faspnetcore-redis-rate-limiting?ref=badge_shield)
+
 ```xml
 PM> Install-Package RedisRateLimiting
 ```
@@ -169,3 +170,7 @@ These samples intentionally keep things simple for clarity.
 
 
 [![GitHub](https://img.shields.io/github/license/cristipufu/aspnetcore-redis-rate-limiting)](https://github.com/cristipufu/aspnetcore-redis-rate-limiting/blob/master/LICENSE)
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcristipufu%2Faspnetcore-redis-rate-limiting.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fcristipufu%2Faspnetcore-redis-rate-limiting?ref=badge_large)
