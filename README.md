@@ -26,7 +26,7 @@ Instead of "You can use our API 1000 times per second", this rate limiting strat
 
 <br>
 
-![concurrency](https://user-images.githubusercontent.com/3955285/199057204-a543669d-76b6-4c98-894d-9bb6dd843091.png)
+![concurrency](https://github.com/cristipufu/aspnetcore-redis-rate-limiting/blob/master/docs/concurrency.png)
 
 <br>
 
@@ -59,7 +59,7 @@ The Fixed Window algorithm uses the concept of a window. The window is the amoun
 
 <br>
 
-![fixed_window](https://user-images.githubusercontent.com/3955285/199057624-77a7fa4e-d247-473d-b595-d8733d58edd5.png)
+![fixed_window](https://github.com/cristipufu/aspnetcore-redis-rate-limiting/blob/master/docs/fixed_window.png)
 
 <br>
 
@@ -79,6 +79,34 @@ builder.Services.AddRateLimiter(options =>
 
 <br>
 
+## Sliding Window Rate Limiting
+
+<br>
+
+Unlike the Fixed Window Rate Limiter, which groups the requests into a bucket based on a very definitive time window, the Sliding Window Rate Limiter, restricts requests relative to the current request's timestamp. For example, if you have a 10 req/minute rate limiter, on a fixed window, you could encounter a case where the rate-limiter allows 20 requests during a one minute interval. This can happen if the first 10 requests are on the left side of the current window, and the next 10 requests are on the right side of the window, both having enough space in their respective buckets to be allowed through. If you send those same 20 requests through a Sliding Window Rate Limiter, if they are all sent during a one minute window, only 10 will make it through.
+
+<br>
+
+![fixed_window](https://github.com/cristipufu/aspnetcore-redis-rate-limiting/blob/master/docs/sliding_window.png)
+
+<br>
+
+You can use a new instance of the [RedisSlidingWindowRateLimiter](https://github.com/cristipufu/aspnetcore-redis-rate-limiting/blob/master/src/RedisRateLimiting/SlidingWindow/RedisSlidingWindowRateLimiter.cs) class or configure the predefined extension method:
+
+```C#
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddRedisSlidingWindowLimiter("demo_sliding_window", (opt) =>
+    {
+        opt.ConnectionMultiplexerFactory = () => connectionMultiplexer;
+        opt.PermitLimit = 1;
+        opt.Window = TimeSpan.FromSeconds(2);
+    });
+});
+```
+
+<br>
+
 ## Token Bucket Rate Limiting
 
 <br>
@@ -87,7 +115,7 @@ Token Bucket is an algorithm that derives its name from describing how it works.
 
 <br>
 
-![token_bucket](https://user-images.githubusercontent.com/3955285/199061414-e55b71c3-e4c5-4ee3-a342-dbe43c899152.png)
+![token_bucket](https://github.com/cristipufu/aspnetcore-redis-rate-limiting/blob/master/docs/token_bucket.png)
 
 <br>
 
