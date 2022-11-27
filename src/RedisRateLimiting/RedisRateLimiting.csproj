@@ -15,6 +15,7 @@
 		<RepositoryType>git</RepositoryType>
 		<RepositoryUrl>https://github.com/cristipufu/aspnetcore-redis-rate-limiting</RepositoryUrl>
 		<Version>1.0.0</Version>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
 
 	<ItemGroup>
