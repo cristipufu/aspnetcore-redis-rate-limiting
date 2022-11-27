@@ -19,6 +19,13 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <None Include="..\..\README.md">
+	    <Pack>True</Pack>
+	    <PackagePath>\</PackagePath>
+	  </None>
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="System.Threading.RateLimiting" Version="7.0.0" />
 		<PackageReference Include="StackExchange.Redis" Version="2.6.70" />
 	</ItemGroup>
