@@ -24,6 +24,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <ProjectReference Include="..\..\src\RedisRateLimiting.AspNetCore\RedisRateLimiting.AspNetCore.csproj" />
+	  <ProjectReference Include="..\..\src\RedisRateLimiting\RedisRateLimiting.csproj" />
 	  <ProjectReference Include="..\RedisRateLimiting.Sample.AspNetCore\RedisRateLimiting.Sample.AspNetCore.csproj" />
 	</ItemGroup>
 

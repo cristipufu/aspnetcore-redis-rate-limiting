@@ -5,6 +5,7 @@ using Xunit;
 
 namespace RedisRateLimiting.Tests
 {
+    [Collection("Seq")]
     public class SlidingWindowIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
     {
         private readonly HttpClient _httpClient;

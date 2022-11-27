@@ -1,11 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc.Testing;
 using RedisRateLimiting.AspNetCore;
-using RedisRateLimiting.Sample;
 using System.Net;
 using Xunit;
 
 namespace RedisRateLimiting.Tests
 {
+    [Collection("Seq")]
     public class ClientIdPolicyIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
     {
         private readonly HttpClient _httpClient;

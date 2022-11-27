@@ -5,6 +5,7 @@ using Xunit;
 
 namespace RedisRateLimiting.Tests
 {
+    [Collection("Seq")]
     public class TokenBucketIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
     {
         private readonly HttpClient _httpClient;

@@ -19,7 +19,7 @@ namespace RedisRateLimiting
 
         private bool _disposed;
 
-        private static readonly ConcurrencyLease FailedLease = new(false, null, null);
+        private readonly ConcurrencyLease FailedLease = new(false, null, null);
 
         public override TimeSpan? IdleDuration => TimeSpan.Zero;
 
