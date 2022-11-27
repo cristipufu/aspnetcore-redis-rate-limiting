@@ -1,7 +1,5 @@
 # aspnetcore-redis-rate-limiting
 
-[![NuGet](https://img.shields.io/nuget/v/RedisRateLimiting)](https://www.nuget.org/packages/RedisRateLimiting) 
-[![GitHub](https://img.shields.io/github/license/cristipufu/aspnetcore-redis-rate-limiting)](https://github.com/cristipufu/aspnetcore-redis-rate-limiting/blob/master/LICENSE)
 
 Set up a Redis backplane for Rate Limiting ASP.NET Core multi-node deployments. The library is build on top of the [built-in Rate Limiting support that's part of .NET 7](https://devblogs.microsoft.com/dotnet/announcing-rate-limiting-for-dotnet/).
 
@@ -10,8 +8,30 @@ For more advanced use cases you can check out the [official documentation here](
 
 
 # install
+
+[![NuGet](https://img.shields.io/nuget/v/RedisRateLimiting)](https://www.nuget.org/packages/RedisRateLimiting) 
 ```xml
 PM> Install-Package RedisRateLimiting
+```
+```
+TargetFramework: net7.0
+
+Dependencies:
+StackExchange.Redis (>= 2.6.70)
+System.Threading.RateLimiting (>= 7.0.0)
+```
+
+
+[![NuGet](https://img.shields.io/nuget/v/RedisRateLimiting.AspNetCore)](https://www.nuget.org/packages/RedisRateLimiting.AspNetCore) 
+```xml
+PM> Install-Package RedisRateLimiting.AspNetCore
+```
+```
+TargetFramework: net7.0
+
+Dependencies:
+Microsoft.AspNetCore.RateLimiting (>= 7.0.0-rc.2.22476.2)
+RedisRateLimiting (>= 1.0.6)
 ```
 
 # strategies
@@ -147,5 +167,5 @@ These samples intentionally keep things simple for clarity.
 
 ---
 
-### MIT License
 
+[![GitHub](https://img.shields.io/github/license/cristipufu/aspnetcore-redis-rate-limiting)](https://github.com/cristipufu/aspnetcore-redis-rate-limiting/blob/master/LICENSE)
