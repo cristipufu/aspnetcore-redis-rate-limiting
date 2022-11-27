@@ -1,5 +1,11 @@
 # aspnetcore-redis-rate-limiting
 
+[![NuGet](https://img.shields.io/nuget/v/RedisRateLimiting)](https://www.nuget.org/packages/RedisRateLimiting)
+[![NuGet](https://img.shields.io/nuget/v/RedisRateLimiting.AspNetCore)](https://www.nuget.org/packages/RedisRateLimiting.AspNetCore) 
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=cristipufu_aspnetcore-redis-rate-limiting&metric=coverage&token=5fea970e583d49909265cbcc99a54f2b5a9d3c19)](https://sonarcloud.io/summary/new_code?id=cristipufu_aspnetcore-redis-rate-limiting)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=cristipufu_aspnetcore-redis-rate-limiting&metric=code_smells&token=5fea970e583d49909265cbcc99a54f2b5a9d3c19)](https://sonarcloud.io/summary/new_code?id=cristipufu_aspnetcore-redis-rate-limiting)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=cristipufu_aspnetcore-redis-rate-limiting&metric=vulnerabilities&token=5fea970e583d49909265cbcc99a54f2b5a9d3c19)](https://sonarcloud.io/summary/new_code?id=cristipufu_aspnetcore-redis-rate-limiting)
+[![GitHub](https://img.shields.io/github/license/cristipufu/aspnetcore-redis-rate-limiting)](https://github.com/cristipufu/aspnetcore-redis-rate-limiting/blob/master/LICENSE)
 
 Set up a Redis backplane for Rate Limiting ASP.NET Core multi-node deployments. The library is build on top of the [built-in Rate Limiting support that's part of .NET 7](https://devblogs.microsoft.com/dotnet/announcing-rate-limiting-for-dotnet/).
 
@@ -9,7 +15,6 @@ For more advanced use cases you can check out the [official documentation here](
 
 # install
 
-[![NuGet](https://img.shields.io/nuget/v/RedisRateLimiting)](https://www.nuget.org/packages/RedisRateLimiting) 
 ```xml
 PM> Install-Package RedisRateLimiting
 ```
@@ -21,8 +26,6 @@ StackExchange.Redis (>= 2.6.70)
 System.Threading.RateLimiting (>= 7.0.0)
 ```
 
-
-[![NuGet](https://img.shields.io/nuget/v/RedisRateLimiting.AspNetCore)](https://www.nuget.org/packages/RedisRateLimiting.AspNetCore) 
 ```xml
 PM> Install-Package RedisRateLimiting.AspNetCore
 ```
@@ -165,7 +168,6 @@ These samples intentionally keep things simple for clarity.
 
 <br>
 
----
 
 
-[![GitHub](https://img.shields.io/github/license/cristipufu/aspnetcore-redis-rate-limiting)](https://github.com/cristipufu/aspnetcore-redis-rate-limiting/blob/master/LICENSE)
+
