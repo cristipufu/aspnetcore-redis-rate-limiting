@@ -24,10 +24,6 @@ namespace RedisRateLimiting
             {
                 throw new ArgumentException(string.Format("{0} must be set to a value greater than 0.", nameof(options.PermitLimit)), nameof(options));
             }
-            if (options.SegmentsPerWindow <= 0)
-            {
-                throw new ArgumentException(string.Format("{0} must be set to a value greater than 0.", nameof(options.SegmentsPerWindow)), nameof(options));
-            }
             if (options.Window <= TimeSpan.Zero)
             {
                 throw new ArgumentException(string.Format("{0} must be set to a value greater than TimeSpan.Zero.", nameof(options.Window)), nameof(options));
@@ -41,7 +37,6 @@ namespace RedisRateLimiting
             {
                 PermitLimit = options.PermitLimit,
                 Window = options.Window,
-                SegmentsPerWindow = options.SegmentsPerWindow,
                 ConnectionMultiplexerFactory = options.ConnectionMultiplexerFactory,
             };
 
@@ -64,19 +59,20 @@ namespace RedisRateLimiting
             {
                 Limit = _options.PermitLimit,
                 Window = _options.Window,
+                RequestId = Guid.NewGuid().ToString(),
             };
 
-            var response = await _redisManager.TryAcquireLeaseAsync();
+            var response = await _redisManager.TryAcquireLeaseAsync(leaseContext.RequestId);
 
             leaseContext.Count = response.Count;
-            leaseContext.RetryAfter = response.RetryAfter;
+            leaseContext.Allowed = response.Allowed;
 
-            if (leaseContext.Count > _options.PermitLimit)
+            if (leaseContext.Allowed)
             {
-                return new SlidingWindowLease(isAcquired: false, leaseContext);
+                return new SlidingWindowLease(isAcquired: true, leaseContext);
             }
 
-            return new SlidingWindowLease(isAcquired: true, leaseContext);
+            return new SlidingWindowLease(isAcquired: false, leaseContext);
         }
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
@@ -90,19 +86,20 @@ namespace RedisRateLimiting
             {
                 Limit = _options.PermitLimit,
                 Window = _options.Window,
+                RequestId = Guid.NewGuid().ToString(),
             };
 
-            var response = _redisManager.TryAcquireLease();
+            var response = _redisManager.TryAcquireLease(leaseContext.RequestId);
 
             leaseContext.Count = response.Count;
-            leaseContext.RetryAfter = response.RetryAfter;
+            leaseContext.Allowed = response.Allowed;
 
-            if (leaseContext.Count > _options.PermitLimit)
+            if (leaseContext.Allowed)
             {
-                return new SlidingWindowLease(isAcquired: false, leaseContext);
+                return new SlidingWindowLease(isAcquired: true, leaseContext);
             }
 
-            return new SlidingWindowLease(isAcquired: true, leaseContext);
+            return new SlidingWindowLease(isAcquired: false, leaseContext);
         }
 
         private sealed class SlidingWindowLeaseContext
@@ -113,12 +110,14 @@ namespace RedisRateLimiting
 
             public TimeSpan Window { get; set; }
 
-            public TimeSpan? RetryAfter { get; set; }
+            public bool Allowed { get; set; }
+
+            public string? RequestId { get; set; }
         }
 
         private sealed class SlidingWindowLease : RateLimitLease
         {
-            private static readonly string[] s_allMetadataNames = new[] { RateLimitMetadataName.Limit.Name, RateLimitMetadataName.Remaining.Name, RateLimitMetadataName.RetryAfter.Name };
+            private static readonly string[] s_allMetadataNames = new[] { RateLimitMetadataName.Limit.Name, RateLimitMetadataName.Remaining.Name };
 
             private readonly SlidingWindowLeaseContext? _context;
 
@@ -143,12 +142,6 @@ namespace RedisRateLimiting
                 if (metadataName == RateLimitMetadataName.Remaining.Name && _context is not null)
                 {
                     metadata = Math.Max(_context.Limit - _context.Count, 0);
-                    return true;
-                }
-
-                if (metadataName == RateLimitMetadataName.RetryAfter.Name && _context?.RetryAfter is not null)
-                {
-                    metadata = (int)_context.RetryAfter.Value.TotalSeconds;
                     return true;
                 }
 

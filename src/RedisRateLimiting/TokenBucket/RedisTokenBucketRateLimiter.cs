@@ -11,7 +11,6 @@ namespace RedisRateLimiting
     {
         private readonly RedisTokenBucketManager _redisManager;
         private readonly RedisTokenBucketRateLimiterOptions _options;
-        private static readonly TokenBucketLease FailedLease = new(false, null);
 
         public override TimeSpan? IdleDuration => TimeSpan.Zero;
 

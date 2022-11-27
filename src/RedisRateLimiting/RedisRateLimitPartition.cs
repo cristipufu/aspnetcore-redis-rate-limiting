@@ -15,7 +15,7 @@ namespace RedisRateLimiting
         /// <param name="partitionKey">The specific key for this partition. This will be used to check for an existing cached limiter before calling the <paramref name="factory"/>.</param>
         /// <param name="factory">The function called when a rate limiter for the given <paramref name="partitionKey"/> is needed. This can return the same instance of <see cref="RedisConcurrencyRateLimiterOptions"/> across different calls.</param>
         /// <returns></returns>
-        public static RateLimitPartition<TKey> GetRedisConcurrencyRateLimiter<TKey>(
+        public static RateLimitPartition<TKey> GetConcurrencyRateLimiter<TKey>(
             TKey partitionKey,
             Func<TKey, RedisConcurrencyRateLimiterOptions> factory)
         {
@@ -29,7 +29,7 @@ namespace RedisRateLimiting
         /// <param name="partitionKey">The specific key for this partition. This will be used to check for an existing cached limiter before calling the <paramref name="factory"/>.</param>
         /// <param name="factory">The function called when a rate limiter for the given <paramref name="partitionKey"/> is needed. This can return the same instance of <see cref="RedisFixedWindowRateLimiterOptions"/> across different calls.</param>
         /// <returns></returns>
-        public static RateLimitPartition<TKey> GetRedisFixedWindowRateLimiter<TKey>(
+        public static RateLimitPartition<TKey> GetFixedWindowRateLimiter<TKey>(
             TKey partitionKey,
             Func<TKey, RedisFixedWindowRateLimiterOptions> factory)
         {
@@ -43,7 +43,7 @@ namespace RedisRateLimiting
         /// <param name="partitionKey">The specific key for this partition. This will be used to check for an existing cached limiter before calling the <paramref name="factory"/>.</param>
         /// <param name="factory">The function called when a rate limiter for the given <paramref name="partitionKey"/> is needed. This can return the same instance of <see cref="RedisSlidingWindowRateLimiterOptions"/> across different calls.</param>
         /// <returns></returns>
-        public static RateLimitPartition<TKey> GetRedisSlidingWindowRateLimiter<TKey>(
+        public static RateLimitPartition<TKey> GetSlidingWindowRateLimiter<TKey>(
             TKey partitionKey,
             Func<TKey, RedisSlidingWindowRateLimiterOptions> factory)
         {
@@ -57,7 +57,7 @@ namespace RedisRateLimiting
         /// <param name="partitionKey">The specific key for this partition. This will be used to check for an existing cached limiter before calling the <paramref name="factory"/>.</param>
         /// <param name="factory">The function called when a rate limiter for the given <paramref name="partitionKey"/> is needed. This can return the same instance of <see cref="RedisTokenBucketRateLimiterOptions"/> across different calls.</param>
         /// <returns></returns>
-        public static RateLimitPartition<TKey> GetRedisTokenBucketRateLimiter<TKey>(
+        public static RateLimitPartition<TKey> GetTokenBucketRateLimiter<TKey>(
             TKey partitionKey,
             Func<TKey, RedisTokenBucketRateLimiterOptions> factory)
         {

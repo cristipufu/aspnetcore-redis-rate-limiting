@@ -21,7 +21,7 @@ namespace RedisRateLimiting.AspNetCore
 
             return options.AddPolicy(policyName, context =>
             {
-                return RedisRateLimitPartition.GetRedisConcurrencyRateLimiter(key, _ => concurrencyRateLimiterOptions);
+                return RedisRateLimitPartition.GetConcurrencyRateLimiter(key, _ => concurrencyRateLimiterOptions);
             });
         }
 
@@ -42,7 +42,7 @@ namespace RedisRateLimiting.AspNetCore
 
             return options.AddPolicy(policyName, context =>
             {
-                return RedisRateLimitPartition.GetRedisFixedWindowRateLimiter(key, _ => fixedWindowRateLimiterOptions);
+                return RedisRateLimitPartition.GetFixedWindowRateLimiter(key, _ => fixedWindowRateLimiterOptions);
             });
         }
 
@@ -63,7 +63,7 @@ namespace RedisRateLimiting.AspNetCore
 
             return options.AddPolicy(policyName, context =>
             {
-                return RedisRateLimitPartition.GetRedisSlidingWindowRateLimiter(key, _ => slidingWindowRateLimiterOptions);
+                return RedisRateLimitPartition.GetSlidingWindowRateLimiter(key, _ => slidingWindowRateLimiterOptions);
             });
         }
 
@@ -84,7 +84,7 @@ namespace RedisRateLimiting.AspNetCore
 
             return options.AddPolicy(policyName, context =>
             {
-                return RedisRateLimitPartition.GetRedisTokenBucketRateLimiter(key, _ => tokenBucketRateLimiterOptions);
+                return RedisRateLimitPartition.GetTokenBucketRateLimiter(key, _ => tokenBucketRateLimiterOptions);
             });
         }
     }

@@ -40,7 +40,7 @@ namespace RedisRateLimiting.Sample.Samples
 
             _logger.LogInformation($"Client: {clientId} PermitLimit: {rateLimit?.PermitLimit ?? 1}");
 
-            return RedisRateLimitPartition.GetRedisConcurrencyRateLimiter(clientId, key => new RedisConcurrencyRateLimiterOptions
+            return RedisRateLimitPartition.GetConcurrencyRateLimiter(clientId, key => new RedisConcurrencyRateLimiterOptions
             {
                 PermitLimit = rateLimit?.PermitLimit ?? 1,
                 QueueLimit = rateLimit?.QueueLimit ?? 0,

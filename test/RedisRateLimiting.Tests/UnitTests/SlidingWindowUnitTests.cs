@@ -30,7 +30,6 @@ namespace RedisRateLimiting.Tests.UnitTests
                new RedisSlidingWindowRateLimiterOptions
                {
                    PermitLimit = 1,
-                   SegmentsPerWindow = 0,
                }));
 
             AssertExtensions.Throws<ArgumentException>("options", () => new RedisSlidingWindowRateLimiter<string>(
@@ -38,7 +37,6 @@ namespace RedisRateLimiting.Tests.UnitTests
                 new RedisSlidingWindowRateLimiterOptions
                 {
                     PermitLimit = 1,
-                    SegmentsPerWindow = 1,
                     Window = TimeSpan.Zero,
                 }));
 
@@ -47,7 +45,6 @@ namespace RedisRateLimiting.Tests.UnitTests
                 new RedisSlidingWindowRateLimiterOptions
                 {
                     PermitLimit = 1,
-                    SegmentsPerWindow = 1,
                     Window = TimeSpan.FromMinutes(-1),
                 }));
 
@@ -56,7 +53,6 @@ namespace RedisRateLimiting.Tests.UnitTests
                 new RedisSlidingWindowRateLimiterOptions
                 {
                     PermitLimit = 1,
-                    SegmentsPerWindow = 1,
                     Window = TimeSpan.FromMinutes(1),
                     ConnectionMultiplexerFactory = null,
                 }));
@@ -70,7 +66,6 @@ namespace RedisRateLimiting.Tests.UnitTests
                 new RedisSlidingWindowRateLimiterOptions
                 {
                     PermitLimit = 1,
-                    SegmentsPerWindow = 1,
                     Window = TimeSpan.FromMinutes(1),
                     ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
                 });
@@ -83,9 +78,9 @@ namespace RedisRateLimiting.Tests.UnitTests
         [Fact]
         public async Task CanAcquireAsyncResource()
         {
-            using var limiter = new RedisFixedWindowRateLimiter<string>(
+            using var limiter = new RedisSlidingWindowRateLimiter<string>(
                 "Test_CanAcquireAsyncResource_SW",
-                new RedisFixedWindowRateLimiterOptions
+                new RedisSlidingWindowRateLimiterOptions
                 {
                     PermitLimit = 1,
                     Window = TimeSpan.FromMinutes(1),
