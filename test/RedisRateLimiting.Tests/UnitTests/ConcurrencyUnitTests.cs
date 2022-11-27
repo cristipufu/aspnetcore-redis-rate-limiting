@@ -1,10 +1,16 @@
-﻿using StackExchange.Redis;
-using Xunit;
+﻿using Xunit;
 
-namespace RedisRateLimiting.Tests
+namespace RedisRateLimiting.Tests.UnitTests
 {
-    public class ConcurrencyUnitTests
+    public class ConcurrencyUnitTests : IClassFixture<TestFixture>
     {
+        private readonly TestFixture Fixture;
+
+        public ConcurrencyUnitTests(TestFixture fixture)
+        {
+            Fixture = fixture;
+        }
+
         [Fact]
         public void InvalidOptionsThrows()
         {
@@ -17,6 +23,13 @@ namespace RedisRateLimiting.Tests
                 new RedisConcurrencyRateLimiterOptions
                 {
                     PermitLimit = -1,
+                }));
+
+            AssertExtensions.Throws<ArgumentException>("options", () => new RedisConcurrencyRateLimiter<string>(
+                string.Empty,
+                new RedisConcurrencyRateLimiterOptions
+                {
+                    QueueLimit = -1,
                 }));
 
             AssertExtensions.Throws<ArgumentException>("options", () => new RedisConcurrencyRateLimiter<string>(
@@ -37,7 +50,7 @@ namespace RedisRateLimiting.Tests
                 {
                     PermitLimit = 1,
                     QueueLimit = 1,
-                    ConnectionMultiplexerFactory = GetRedisInstance
+                    ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
                 });
             var ex = Assert.Throws<ArgumentOutOfRangeException>(() => limiter.AttemptAcquire(2));
             Assert.Equal("permitCount", ex.ParamName);
@@ -53,7 +66,7 @@ namespace RedisRateLimiting.Tests
                 new RedisConcurrencyRateLimiterOptions
                 {
                     PermitLimit = 1,
-                    ConnectionMultiplexerFactory = GetRedisInstance
+                    ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
                 });
 
             var lease = await limiter.AcquireAsync();
@@ -78,7 +91,7 @@ namespace RedisRateLimiting.Tests
                 new RedisConcurrencyRateLimiterOptions
                 {
                     PermitLimit = 1,
-                    ConnectionMultiplexerFactory = GetRedisInstance
+                    ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
                 });
 
             var lease = limiter.AttemptAcquire();
@@ -105,7 +118,7 @@ namespace RedisRateLimiting.Tests
                 {
                     PermitLimit = 1,
                     QueueLimit = 2,
-                    ConnectionMultiplexerFactory = GetRedisInstance,
+                    ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
                 });
 
             var lease = await limiter.AcquireAsync();
@@ -139,7 +152,7 @@ namespace RedisRateLimiting.Tests
                 {
                     PermitLimit = 1,
                     QueueLimit = 1,
-                    ConnectionMultiplexerFactory = GetRedisInstance,
+                    ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
                 });
 
             using var lease = limiter.AttemptAcquire();
@@ -158,9 +171,9 @@ namespace RedisRateLimiting.Tests
                 {
                     PermitLimit = 1,
                     QueueLimit = 1,
-                    ConnectionMultiplexerFactory = GetRedisInstance,
+                    ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
                 });
-           
+
             var lease = limiter.AttemptAcquire();
             var wait = limiter.AcquireAsync();
 
@@ -189,7 +202,7 @@ namespace RedisRateLimiting.Tests
                 {
                     PermitLimit = 2,
                     QueueLimit = 2,
-                    ConnectionMultiplexerFactory = GetRedisInstance,
+                    ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
                 });
             using var lease = await limiter.AcquireAsync();
             Assert.True(lease.IsAcquired);
@@ -208,12 +221,6 @@ namespace RedisRateLimiting.Tests
             using var lease2 = await wait2;
             Assert.True(lease1.IsAcquired);
             Assert.True(lease2.IsAcquired);
-        }
-
-        private IConnectionMultiplexer GetRedisInstance()
-        {
-            var redisOptions = ConfigurationOptions.Parse(",ssl=True,abortConnect=False");
-            return ConnectionMultiplexer.Connect(redisOptions);
         }
     }
 }

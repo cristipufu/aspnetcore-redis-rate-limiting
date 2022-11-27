@@ -75,10 +75,9 @@ app.UseAuthorization();
 app.MapControllers();
 
 
-var scope = app.Services.CreateScope();
+using var scope = app.Services.CreateScope();
 var dbContext = scope.ServiceProvider.GetRequiredService<SampleDbContext>();
 dbContext.Database.Migrate();
-scope.Dispose();
 
 app.Run();
 

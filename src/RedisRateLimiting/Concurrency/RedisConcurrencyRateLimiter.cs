@@ -11,7 +11,6 @@ namespace RedisRateLimiting
     public class RedisConcurrencyRateLimiter<TKey> : RateLimiter
     {
         private readonly RedisConcurrencyManager _redisManager;
-
         private readonly RedisConcurrencyRateLimiterOptions _options;
         private readonly ConcurrentQueue<Request> _queue = new();
 
@@ -33,6 +32,10 @@ namespace RedisRateLimiting
             if (options.PermitLimit <= 0)
             {
                 throw new ArgumentException(string.Format("{0} must be set to a value greater than 0.", nameof(options.PermitLimit)), nameof(options));
+            }
+            if (options.QueueLimit < 0)
+            {
+                throw new ArgumentException(string.Format("{0} must be set to a value greater than 0.", nameof(options.QueueLimit)), nameof(options));
             }
             if (options.ConnectionMultiplexerFactory is null)
             {
@@ -265,7 +268,7 @@ namespace RedisRateLimiting
 
         private sealed class ConcurrencyLease : RateLimitLease
         {
-            private static readonly string[] s_allMetadataNames = new[] { MetadataName.ReasonPhrase.Name, RateLimitMetadataName.Limit.Name, RateLimitMetadataName.Remaining.Name };
+            private static readonly string[] s_allMetadataNames = new[] { RateLimitMetadataName.Limit.Name, RateLimitMetadataName.Remaining.Name };
 
             private bool _disposed;
             private readonly RedisConcurrencyRateLimiter<TKey>? _limiter;

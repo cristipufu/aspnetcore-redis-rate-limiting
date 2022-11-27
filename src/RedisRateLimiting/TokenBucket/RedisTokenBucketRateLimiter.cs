@@ -1,4 +1,4 @@
-﻿using StackExchange.Redis;
+﻿using RedisRateLimiting.Concurrency;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -9,45 +9,8 @@ namespace RedisRateLimiting
 {
     public class RedisTokenBucketRateLimiter<TKey> : RateLimiter
     {
+        private readonly RedisTokenBucketManager _redisManager;
         private readonly RedisTokenBucketRateLimiterOptions _options;
-        private readonly TKey _partitionKey;
-        private readonly IConnectionMultiplexer _connectionMultiplexer;
-
-        private static readonly LuaScript _redisScript = LuaScript.Prepare(
-          @"local rate = tonumber(@tokens_per_period)
-            local limit = tonumber(@token_limit)
-            local requested = tonumber(@permit_count)
-            local now = tonumber(@current_time)
-            local period = tonumber(@replenish_period)
-
-            local current_tokens = tonumber(redis.call(""get"", @rate_limit_key))
-            if current_tokens == nil then
-              current_tokens = limit
-            end
-
-            local timestamp_key = @rate_limit_key .. "":ts""
-            local last_refreshed = tonumber(redis.call(""get"", timestamp_key))
-            if last_refreshed == nil then
-              last_refreshed = 0
-            end
-
-            local delta_ts = math.max(0, now - last_refreshed)
-            local segments = math.floor(delta_ts / period)
-            current_tokens = math.min(limit, current_tokens + (segments * rate))
-
-            local allowed = current_tokens >= requested
-            if allowed then
-               current_tokens = current_tokens - requested
-            end
-
-            local fill_time = limit / rate
-            local ttl = math.floor(fill_time * 2)
-
-            redis.call(""setex"", @rate_limit_key, ttl, current_tokens)
-            redis.call(""setex"", timestamp_key, ttl, now)
-
-            return { allowed, current_tokens }");
-
         private static readonly TokenBucketLease FailedLease = new(false, null);
 
         public override TimeSpan? IdleDuration => TimeSpan.Zero;
@@ -58,6 +21,10 @@ namespace RedisRateLimiting
             {
                 throw new ArgumentNullException(nameof(options));
             }
+            if (options.TokenLimit <= 0)
+            {
+                throw new ArgumentException(string.Format("{0} must be set to a value greater than 0.", nameof(options.TokenLimit)), nameof(options));
+            }
             if (options.TokensPerPeriod <= 0)
             {
                 throw new ArgumentException(string.Format("{0} must be set to a value greater than 0.", nameof(options.TokensPerPeriod)), nameof(options));
@@ -66,17 +33,11 @@ namespace RedisRateLimiting
             {
                 throw new ArgumentException(string.Format("{0} must be set to a value greater than TimeSpan.Zero.", nameof(options.ReplenishmentPeriod)), nameof(options));
             }
-            if (options.TokenLimit <= 0)
-            {
-                throw new ArgumentException(string.Format("{0} must be set to a value greater than 0.", nameof(options.TokenLimit)), nameof(options));
-            }
+            
             if (options.ConnectionMultiplexerFactory is null)
             {
                 throw new ArgumentException(string.Format("{0} must not be null.", nameof(options.ConnectionMultiplexerFactory)), nameof(options));
             }
-
-            _partitionKey = partitionKey;
-
             _options = new RedisTokenBucketRateLimiterOptions
             {
                 ConnectionMultiplexerFactory = options.ConnectionMultiplexerFactory,
@@ -85,7 +46,7 @@ namespace RedisRateLimiting
                 TokensPerPeriod = options.TokensPerPeriod,
             };
 
-            _connectionMultiplexer = _options.ConnectionMultiplexerFactory();
+            _redisManager = new RedisTokenBucketManager(partitionKey?.ToString() ?? string.Empty, _options);
         }
 
         public override RateLimiterStatistics? GetStatistics()
@@ -105,32 +66,12 @@ namespace RedisRateLimiting
                 Limit = _options.TokenLimit,
             };
 
-            var now = DateTimeOffset.UtcNow;
-            var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
+            var response = await _redisManager.TryAcquireLeaseAsync();
 
-            var database = _connectionMultiplexer.GetDatabase();
+            leaseContext.Allowed = response.Allowed;
+            leaseContext.Count = response.Count;
 
-            var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
-                _redisScript,
-                new
-                {
-                    rate_limit_key = $"rl:{_partitionKey}",
-                    current_time = nowUnixTimeSeconds,
-                    tokens_per_period = _options.TokensPerPeriod,
-                    token_limit = _options.TokenLimit,
-                    replenish_period = _options.ReplenishmentPeriod.TotalSeconds,
-                    permit_count = 1D,
-                });
-
-            bool allowed = false;
-
-            if (response != null)
-            {
-                allowed = (bool)response[0];
-                leaseContext.Count = (long)response[1];
-            }
-
-            if (allowed)
+            if (leaseContext.Allowed)
             {
                 return new TokenBucketLease(isAcquired: true, leaseContext);
             }
@@ -140,7 +81,27 @@ namespace RedisRateLimiting
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
         {
-            return FailedLease;
+            if (permitCount > _options.TokenLimit)
+            {
+                throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.TokenLimit));
+            }
+
+            var leaseContext = new TokenBucketLeaseContext
+            {
+                Limit = _options.TokenLimit,
+            };
+
+            var response = _redisManager.TryAcquireLease();
+
+            leaseContext.Allowed = response.Allowed;
+            leaseContext.Count = response.Count;
+
+            if (leaseContext.Allowed)
+            {
+                return new TokenBucketLease(isAcquired: true, leaseContext);
+            }
+
+            return new TokenBucketLease(isAcquired: false, leaseContext);
         }
 
         private sealed class TokenBucketLeaseContext
@@ -149,12 +110,14 @@ namespace RedisRateLimiting
 
             public long Limit { get; set; }
 
+            public bool Allowed { get; set; }
+
             public TimeSpan? RetryAfter { get; set; }
         }
 
         private sealed class TokenBucketLease : RateLimitLease
         {
-            private static readonly string[] s_allMetadataNames = new[] { MetadataName.RetryAfter.Name };
+            private static readonly string[] s_allMetadataNames = new[] { RateLimitMetadataName.Limit.Name, RateLimitMetadataName.Remaining.Name, RateLimitMetadataName.RetryAfter.Name };
 
             private readonly TokenBucketLeaseContext? _context;
 

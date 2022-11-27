@@ -1,4 +1,4 @@
-﻿using StackExchange.Redis;
+﻿using RedisRateLimiting.Concurrency;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -9,18 +9,9 @@ namespace RedisRateLimiting
 {
     public class RedisSlidingWindowRateLimiter<TKey> : RateLimiter
     {
+        private readonly RedisSlidingWindowManager _redisManager;
         private readonly RedisSlidingWindowRateLimiterOptions _options;
-        private readonly TKey _partitionKey;
-        private readonly IConnectionMultiplexer _connectionMultiplexer;
-
-        private static readonly LuaScript _redisScript = LuaScript.Prepare(
-          @"
-                // TODO
-            ");
-
-        private static readonly RateLimitLease SuccessfulLease = new SlidingWindowLease(true, null);
-        private static readonly RateLimitLease FailedLease = new SlidingWindowLease(false, null);
-
+        
         public override TimeSpan? IdleDuration => TimeSpan.Zero;
 
         public RedisSlidingWindowRateLimiter(TKey partitionKey, RedisSlidingWindowRateLimiterOptions options)
@@ -54,9 +45,7 @@ namespace RedisRateLimiting
                 ConnectionMultiplexerFactory = options.ConnectionMultiplexerFactory,
             };
 
-            _partitionKey = partitionKey;
-
-            _connectionMultiplexer = _options.ConnectionMultiplexerFactory();
+            _redisManager = new RedisSlidingWindowManager(partitionKey?.ToString() ?? string.Empty, _options);
         }
 
         public override RateLimiterStatistics? GetStatistics()
@@ -71,53 +60,72 @@ namespace RedisRateLimiting
                 throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.PermitLimit));
             }
 
-            var database = _connectionMultiplexer.GetDatabase();
-
-            var now = DateTimeOffset.UtcNow;
-            var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
-
-            var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
-                _redisScript,
-                new
-                {
-                    rate_limit_key = $"rl:{_partitionKey}",
-                    next_expires_at = now.Add(_options.Window).ToUnixTimeSeconds(),
-                    current_time = nowUnixTimeSeconds,
-                    increment_amount = 1D,
-                });
-
-            long count = 1;
-            long expireAt = nowUnixTimeSeconds;
-
-            if (response != null)
+            var leaseContext = new SlidingWindowLeaseContext
             {
-                count = (long)response[0];
-                expireAt = (long)response[1];
+                Limit = _options.PermitLimit,
+                Window = _options.Window,
+            };
+
+            var response = await _redisManager.TryAcquireLeaseAsync();
+
+            leaseContext.Count = response.Count;
+            leaseContext.RetryAfter = response.RetryAfter;
+
+            if (leaseContext.Count > _options.PermitLimit)
+            {
+                return new SlidingWindowLease(isAcquired: false, leaseContext);
             }
 
-            if (count > _options.PermitLimit)
-            {
-                return new SlidingWindowLease(isAcquired: false, TimeSpan.FromSeconds(expireAt - nowUnixTimeSeconds));
-            }
-
-            return SuccessfulLease;
+            return new SlidingWindowLease(isAcquired: true, leaseContext);
         }
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
         {
-            return FailedLease;
+            if (permitCount > _options.PermitLimit)
+            {
+                throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.PermitLimit));
+            }
+
+            var leaseContext = new SlidingWindowLeaseContext
+            {
+                Limit = _options.PermitLimit,
+                Window = _options.Window,
+            };
+
+            var response = _redisManager.TryAcquireLease();
+
+            leaseContext.Count = response.Count;
+            leaseContext.RetryAfter = response.RetryAfter;
+
+            if (leaseContext.Count > _options.PermitLimit)
+            {
+                return new SlidingWindowLease(isAcquired: false, leaseContext);
+            }
+
+            return new SlidingWindowLease(isAcquired: true, leaseContext);
+        }
+
+        private sealed class SlidingWindowLeaseContext
+        {
+            public long Count { get; set; }
+
+            public long Limit { get; set; }
+
+            public TimeSpan Window { get; set; }
+
+            public TimeSpan? RetryAfter { get; set; }
         }
 
         private sealed class SlidingWindowLease : RateLimitLease
         {
-            private static readonly string[] s_allMetadataNames = new[] { MetadataName.RetryAfter.Name };
+            private static readonly string[] s_allMetadataNames = new[] { RateLimitMetadataName.Limit.Name, RateLimitMetadataName.Remaining.Name, RateLimitMetadataName.RetryAfter.Name };
 
-            private readonly TimeSpan? _retryAfter;
+            private readonly SlidingWindowLeaseContext? _context;
 
-            public SlidingWindowLease(bool isAcquired, TimeSpan? retryAfter)
+            public SlidingWindowLease(bool isAcquired, SlidingWindowLeaseContext? context)
             {
                 IsAcquired = isAcquired;
-                _retryAfter = retryAfter;
+                _context = context;
             }
 
             public override bool IsAcquired { get; }
@@ -126,9 +134,21 @@ namespace RedisRateLimiting
 
             public override bool TryGetMetadata(string metadataName, out object? metadata)
             {
-                if (metadataName == MetadataName.RetryAfter.Name && _retryAfter.HasValue)
+                if (metadataName == RateLimitMetadataName.Limit.Name && _context is not null)
                 {
-                    metadata = _retryAfter.Value;
+                    metadata = _context.Limit.ToString();
+                    return true;
+                }
+
+                if (metadataName == RateLimitMetadataName.Remaining.Name && _context is not null)
+                {
+                    metadata = Math.Max(_context.Limit - _context.Count, 0);
+                    return true;
+                }
+
+                if (metadataName == RateLimitMetadataName.RetryAfter.Name && _context?.RetryAfter is not null)
+                {
+                    metadata = (int)_context.RetryAfter.Value.TotalSeconds;
                     return true;
                 }
 
