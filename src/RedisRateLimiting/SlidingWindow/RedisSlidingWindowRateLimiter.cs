@@ -48,31 +48,14 @@ namespace RedisRateLimiting
             throw new NotImplementedException();
         }
 
-        protected override async ValueTask<RateLimitLease> AcquireAsyncCore(int permitCount, CancellationToken cancellationToken)
+        protected override ValueTask<RateLimitLease> AcquireAsyncCore(int permitCount, CancellationToken cancellationToken)
         {
             if (permitCount > _options.PermitLimit)
             {
                 throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.PermitLimit));
             }
 
-            var leaseContext = new SlidingWindowLeaseContext
-            {
-                Limit = _options.PermitLimit,
-                Window = _options.Window,
-                RequestId = Guid.NewGuid().ToString(),
-            };
-
-            var response = await _redisManager.TryAcquireLeaseAsync(leaseContext.RequestId);
-
-            leaseContext.Count = response.Count;
-            leaseContext.Allowed = response.Allowed;
-
-            if (leaseContext.Allowed)
-            {
-                return new SlidingWindowLease(isAcquired: true, leaseContext);
-            }
-
-            return new SlidingWindowLease(isAcquired: false, leaseContext);
+            return AcquireAsyncCoreInternal();
         }
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
@@ -90,6 +73,28 @@ namespace RedisRateLimiting
             };
 
             var response = _redisManager.TryAcquireLease(leaseContext.RequestId);
+
+            leaseContext.Count = response.Count;
+            leaseContext.Allowed = response.Allowed;
+
+            if (leaseContext.Allowed)
+            {
+                return new SlidingWindowLease(isAcquired: true, leaseContext);
+            }
+
+            return new SlidingWindowLease(isAcquired: false, leaseContext);
+        }
+
+        private async ValueTask<RateLimitLease> AcquireAsyncCoreInternal()
+        {
+            var leaseContext = new SlidingWindowLeaseContext
+            {
+                Limit = _options.PermitLimit,
+                Window = _options.Window,
+                RequestId = Guid.NewGuid().ToString(),
+            };
+
+            var response = await _redisManager.TryAcquireLeaseAsync(leaseContext.RequestId);
 
             leaseContext.Count = response.Count;
             leaseContext.Allowed = response.Allowed;

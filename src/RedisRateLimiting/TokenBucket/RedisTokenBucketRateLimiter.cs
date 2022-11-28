@@ -53,29 +53,14 @@ namespace RedisRateLimiting
             throw new NotImplementedException();
         }
 
-        protected override async ValueTask<RateLimitLease> AcquireAsyncCore(int permitCount, CancellationToken cancellationToken)
+        protected override ValueTask<RateLimitLease> AcquireAsyncCore(int permitCount, CancellationToken cancellationToken)
         {
             if (permitCount > _options.TokenLimit)
             {
                 throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.TokenLimit));
             }
 
-            var leaseContext = new TokenBucketLeaseContext
-            {
-                Limit = _options.TokenLimit,
-            };
-
-            var response = await _redisManager.TryAcquireLeaseAsync();
-
-            leaseContext.Allowed = response.Allowed;
-            leaseContext.Count = response.Count;
-
-            if (leaseContext.Allowed)
-            {
-                return new TokenBucketLease(isAcquired: true, leaseContext);
-            }
-
-            return new TokenBucketLease(isAcquired: false, leaseContext);
+            return AcquireAsyncCoreInternal();
         }
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
@@ -91,6 +76,26 @@ namespace RedisRateLimiting
             };
 
             var response = _redisManager.TryAcquireLease();
+
+            leaseContext.Allowed = response.Allowed;
+            leaseContext.Count = response.Count;
+
+            if (leaseContext.Allowed)
+            {
+                return new TokenBucketLease(isAcquired: true, leaseContext);
+            }
+
+            return new TokenBucketLease(isAcquired: false, leaseContext);
+        }
+
+        private async ValueTask<RateLimitLease> AcquireAsyncCoreInternal()
+        {
+            var leaseContext = new TokenBucketLeaseContext
+            {
+                Limit = _options.TokenLimit,
+            };
+
+            var response = await _redisManager.TryAcquireLeaseAsync();
 
             leaseContext.Allowed = response.Allowed;
             leaseContext.Count = response.Count;

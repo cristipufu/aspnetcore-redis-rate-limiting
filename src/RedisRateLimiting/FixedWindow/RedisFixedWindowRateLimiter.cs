@@ -48,30 +48,14 @@ namespace RedisRateLimiting
             throw new NotImplementedException();
         }
 
-        protected override async ValueTask<RateLimitLease> AcquireAsyncCore(int permitCount, CancellationToken cancellationToken)
+        protected override ValueTask<RateLimitLease> AcquireAsyncCore(int permitCount, CancellationToken cancellationToken)
         {
             if (permitCount > _options.PermitLimit)
             {
                 throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.PermitLimit));
             }
 
-            var leaseContext = new FixedWindowLeaseContext
-            {
-                Limit = _options.PermitLimit,
-                Window = _options.Window,
-            };
-
-            var response = await _redisManager.TryAcquireLeaseAsync();
-
-            leaseContext.Count = response.Count;
-            leaseContext.RetryAfter = response.RetryAfter;
-
-            if (leaseContext.Count > _options.PermitLimit)
-            {
-                return new FixedWindowLease(isAcquired: false, leaseContext);
-            }
-
-            return new FixedWindowLease(isAcquired: true, leaseContext);
+            return AcquireAsyncCoreInternal();
         }
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
@@ -88,6 +72,27 @@ namespace RedisRateLimiting
             };
 
             var response = _redisManager.TryAcquireLease();
+
+            leaseContext.Count = response.Count;
+            leaseContext.RetryAfter = response.RetryAfter;
+
+            if (leaseContext.Count > _options.PermitLimit)
+            {
+                return new FixedWindowLease(isAcquired: false, leaseContext);
+            }
+
+            return new FixedWindowLease(isAcquired: true, leaseContext);
+        }
+
+        private async ValueTask<RateLimitLease> AcquireAsyncCoreInternal()
+        {
+            var leaseContext = new FixedWindowLeaseContext
+            {
+                Limit = _options.PermitLimit,
+                Window = _options.Window,
+            };
+
+            var response = await _redisManager.TryAcquireLeaseAsync();
 
             leaseContext.Count = response.Count;
             leaseContext.RetryAfter = response.RetryAfter;

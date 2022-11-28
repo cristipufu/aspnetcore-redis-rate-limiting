@@ -184,11 +184,11 @@ namespace RedisRateLimiting.Tests.UnitTests
             lease = await wait;
             Assert.True(lease.IsAcquired);
 
-            wait = limiter.AcquireAsync();
-            Assert.False(wait.IsCompleted);
+            var wait2 = limiter.AcquireAsync();
+            Assert.False(wait2.IsCompleted);
 
             lease.Dispose();
-            lease = await wait;
+            lease = await wait2;
             Assert.True(lease.IsAcquired);
             lease.Dispose();
         }
