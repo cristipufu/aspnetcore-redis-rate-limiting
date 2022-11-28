@@ -60,9 +60,8 @@ namespace RedisRateLimiting.Sample.AspNetCore.Database
                     Identifier = "client3",
                 });
         }
-        protected override void OnConfiguring(DbContextOptionsBuilder options)
-            => options.UseSqlite($"Data Source={DbPath}");
-
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+            => optionsBuilder.UseSqlite($"Data Source={DbPath}");
 
         public DbSet<Client> Clients { get; set; }
 

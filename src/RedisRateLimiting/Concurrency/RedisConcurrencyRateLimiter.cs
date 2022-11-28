@@ -248,6 +248,8 @@ namespace RedisRateLimiting
                 request?.CancellationTokenRegistration.Dispose();
                 request?.TaskCompletionSource?.TrySetResult(FailedLease);
             }
+
+            base.Dispose(disposing);
         }
 
         protected override ValueTask DisposeAsyncCore()

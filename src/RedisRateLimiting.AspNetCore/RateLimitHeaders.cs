@@ -1,6 +1,6 @@
 ﻿namespace RedisRateLimiting.AspNetCore
 {
-    public class RateLimitHeaders
+    public static class RateLimitHeaders
     {
         public const string Limit = "X-RateLimit-Limit";
         public const string Remaining = "X-RateLimit-Remaining";
