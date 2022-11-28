@@ -30,6 +30,14 @@ namespace RedisRateLimiting.Tests.UnitTests
                new RedisTokenBucketRateLimiterOptions
                {
                    TokenLimit = 1,
+                   TokensPerPeriod = -1,
+               }));
+
+            AssertExtensions.Throws<ArgumentException>("options", () => new RedisTokenBucketRateLimiter<string>(
+               string.Empty,
+               new RedisTokenBucketRateLimiterOptions
+               {
+                   TokenLimit = 1,
                    TokensPerPeriod = 1,
                }));
 
