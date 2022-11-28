@@ -38,11 +38,13 @@ namespace RedisRateLimiting.Sample.Samples
 
             var rateLimit = dbContext.Clients.Where(x => x.Identifier == clientId).Select(x => x.RateLimit).FirstOrDefault();
 
-            _logger.LogInformation($"Client: {clientId} PermitLimit: {rateLimit?.PermitLimit ?? 1}");
+            var permitLimit = rateLimit?.PermitLimit ?? 1;
+
+            _logger.LogInformation("Client: {clientId} PermitLimit: {permitLimit}", clientId, permitLimit);
 
             return RedisRateLimitPartition.GetConcurrencyRateLimiter(clientId, key => new RedisConcurrencyRateLimiterOptions
             {
-                PermitLimit = rateLimit?.PermitLimit ?? 1,
+                PermitLimit = permitLimit,
                 QueueLimit = rateLimit?.QueueLimit ?? 0,
                 ConnectionMultiplexerFactory = () => _connectionMultiplexer,
             });

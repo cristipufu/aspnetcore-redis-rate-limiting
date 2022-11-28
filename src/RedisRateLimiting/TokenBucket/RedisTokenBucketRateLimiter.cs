@@ -115,13 +115,11 @@ namespace RedisRateLimiting
             public long Limit { get; set; }
 
             public bool Allowed { get; set; }
-
-            public TimeSpan? RetryAfter { get; set; }
         }
 
         private sealed class TokenBucketLease : RateLimitLease
         {
-            private static readonly string[] s_allMetadataNames = new[] { RateLimitMetadataName.Limit.Name, RateLimitMetadataName.Remaining.Name, RateLimitMetadataName.RetryAfter.Name };
+            private static readonly string[] s_allMetadataNames = new[] { RateLimitMetadataName.Limit.Name, RateLimitMetadataName.Remaining.Name };
 
             private readonly TokenBucketLeaseContext? _context;
 
@@ -146,12 +144,6 @@ namespace RedisRateLimiting
                 if (metadataName == RateLimitMetadataName.Remaining.Name && _context is not null)
                 {
                     metadata = _context.Count;
-                    return true;
-                }
-
-                if (metadataName == RateLimitMetadataName.RetryAfter.Name && _context?.RetryAfter is not null)
-                {
-                    metadata = (int)_context.RetryAfter.Value.TotalSeconds;
                     return true;
                 }
 
