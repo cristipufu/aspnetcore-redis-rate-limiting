@@ -34,16 +34,38 @@ namespace RedisRateLimiting.Concurrency
             if allowed
             then
 
-                redis.call(""zadd"", @rate_limit_key, timestamp, @unique_id)
-
                 if queue_limit > 0
                 then
-                    -- remove from pending queue
-                    redis.call(""zrem"", @queue_key, @unique_id)
+                    queue_count = redis.call(""zcard"", @queue_key)
                 end
 
-            else
+                
+                if queue_count == 0 or try_enqueue == 0
+                then
 
+                    redis.call(""zadd"", @rate_limit_key, timestamp, @unique_id)
+
+                    if queue_limit > 0
+                    then
+                        -- remove from pending queue
+                        redis.call(""zrem"", @queue_key, @unique_id)
+                    end
+                
+                else
+                    -- queue the current request next in line if we have any requests in the pending queue
+                    allowed = false
+
+                    queued = queue_count + count < limit + queue_limit
+
+                    if queued
+                    then
+                        redis.call(""zadd"", @queue_key, timestamp, @unique_id)
+                    end
+
+                end
+            
+            else
+                -- try to queue request
                 if queue_limit > 0 and try_enqueue == 1
                 then
 
@@ -64,18 +86,8 @@ namespace RedisRateLimiting.Concurrency
             string partitionKey,
             RedisConcurrencyRateLimiterOptions options)
         {
-            if (options is null)
-            {
-                throw new ArgumentNullException(nameof(options));
-            }
-
-            if (options.ConnectionMultiplexerFactory is null)
-            {
-                throw new ArgumentException(string.Format("{0} must not be null.", nameof(options.ConnectionMultiplexerFactory)), nameof(options));
-            }
-
             _options = options;
-            _connectionMultiplexer = options.ConnectionMultiplexerFactory.Invoke();
+            _connectionMultiplexer = options.ConnectionMultiplexerFactory!.Invoke();
 
             RateLimitKey = $"rl:{partitionKey}";
             QueueRateLimitKey = $"rl:{partitionKey}:q";

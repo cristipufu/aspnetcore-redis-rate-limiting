@@ -49,18 +49,8 @@ namespace RedisRateLimiting.Concurrency
             string partitionKey,
             RedisTokenBucketRateLimiterOptions options)
         {
-            if (options is null)
-            {
-                throw new ArgumentNullException(nameof(options));
-            }
-
-            if (options.ConnectionMultiplexerFactory is null)
-            {
-                throw new ArgumentException(string.Format("{0} must not be null.", nameof(options.ConnectionMultiplexerFactory)), nameof(options));
-            }
-
             _options = options;
-            _connectionMultiplexer = options.ConnectionMultiplexerFactory.Invoke();
+            _connectionMultiplexer = options.ConnectionMultiplexerFactory!.Invoke();
 
             RateLimitKey = $"rl:{partitionKey}";
         }

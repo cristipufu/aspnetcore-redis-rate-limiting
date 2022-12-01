@@ -15,7 +15,6 @@ namespace RedisRateLimiting
         private readonly ConcurrentQueue<Request> _queue = new();
 
         private readonly PeriodicTimer? _periodicTimer;
-        private readonly CancellationTokenSource? _periodicTimerCts;
 
         private bool _disposed;
 
@@ -47,16 +46,16 @@ namespace RedisRateLimiting
                 ConnectionMultiplexerFactory = options.ConnectionMultiplexerFactory,
                 PermitLimit = options.PermitLimit,
                 QueueLimit = options.QueueLimit,
+                TryDequeuePeriod = options.TryDequeuePeriod,
             };
 
             _redisManager = new RedisConcurrencyManager(partitionKey?.ToString() ?? string.Empty, _options);
 
             if (_options.QueueLimit > 0)
             {
-                _periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
-                _periodicTimerCts = new CancellationTokenSource();
+                _periodicTimer = new PeriodicTimer(_options.TryDequeuePeriod);
 
-                _ = Task.Run(() => TryDequeueRequestsAsync(_periodicTimerCts.Token), _periodicTimerCts.Token);
+                _ = StartDequeueTimerAsync(_periodicTimer);
             }
         }
 
@@ -121,6 +120,7 @@ namespace RedisRateLimiting
             {
                 Request request = new()
                 {
+                    CancellationToken = cancellationToken,
                     LeaseContext = leaseContext,
                     TaskCompletionSource = new TaskCompletionSource<RateLimitLease>(),
                 };
@@ -130,9 +130,10 @@ namespace RedisRateLimiting
                     request.CancellationTokenRegistration = cancellationToken.Register(static obj =>
                     {
                         // When the request gets canceled
-                        ((TaskCompletionSource<RateLimitLease>)obj!).TrySetCanceled();
+                        var request = (Request)obj!;
+                        request.TaskCompletionSource!.TrySetCanceled(request.CancellationToken);
 
-                    }, request.TaskCompletionSource);
+                    }, request);
                 }
 
                 _queue.Enqueue(request);
@@ -150,84 +151,70 @@ namespace RedisRateLimiting
             _redisManager.ReleaseLease(leaseContext.RequestId);
         }
 
-        private async Task TryDequeueRequestsAsync(CancellationToken ct)
+        private async Task StartDequeueTimerAsync(PeriodicTimer periodicTimer)
         {
-            if (_periodicTimer == null)
+            while (await periodicTimer.WaitForNextTickAsync())
             {
-                return;
+                await TryDequeueRequestsAsync();
             }
+        }
 
-            while (await _periodicTimer.WaitForNextTickAsync(ct))
+        private async Task TryDequeueRequestsAsync()
+        {
+            try
             {
-                if (ct.IsCancellationRequested)
+                while (_queue.TryPeek(out var request))
                 {
-                    break;
-                }
-
-                try
-                {
-                    while (_queue.TryPeek(out var request))
+                    if (request.TaskCompletionSource!.Task.IsCompleted)
                     {
-                        if (request == null ||
-                            request.TaskCompletionSource == null ||
-                            request.LeaseContext?.RequestId == null)
+                        try
                         {
+                            // The request was canceled while in the pending queue
+                            await _redisManager.ReleaseQueueLeaseAsync(request.LeaseContext!.RequestId!);
+                        }
+                        finally
+                        {
+                            request.CancellationTokenRegistration.Dispose();
+
                             _queue.TryDequeue(out _);
-
-                            continue;
                         }
 
-                        if (request.TaskCompletionSource.Task.IsCompleted)
+                        continue;
+                    }
+
+                    var response = await _redisManager.TryAcquireLeaseAsync(request.LeaseContext!.RequestId!);
+
+                    request.LeaseContext.Count = response.Count;
+
+                    if (response.Allowed)
+                    {
+                        var pendingLease = new ConcurrencyLease(isAcquired: true, this, request.LeaseContext);
+
+                        try
                         {
-                            try
+                            if (request.TaskCompletionSource?.TrySetResult(pendingLease) == false)
                             {
-                                // The request was canceled while in the pending queue
-                                await _redisManager.ReleaseQueueLeaseAsync(request.LeaseContext.RequestId);
-                            }
-                            finally
-                            {
-                                request.CancellationTokenRegistration.Dispose();
-
-                                _queue.TryDequeue(out _);
-                            }
-
-                            continue;
-                        }
-
-                        var response = await _redisManager.TryAcquireLeaseAsync(request.LeaseContext.RequestId);
-
-                        request.LeaseContext.Count = response.Count;
-
-                        if (response.Allowed)
-                        {
-                            var pendingLease = new ConcurrencyLease(isAcquired: true, this, request.LeaseContext);
-
-                            try
-                            {
-                                if (request.TaskCompletionSource?.TrySetResult(pendingLease) == false)
-                                {
-                                    // The request was canceled after we acquired the lease
-                                    await _redisManager.ReleaseLeaseAsync(request.LeaseContext.RequestId);
-                                }
-                            }
-                            finally
-                            {
-                                request.CancellationTokenRegistration.Dispose();
-
-                                _queue.TryDequeue(out _);
+                                // The request was canceled after we acquired the lease
+                                await _redisManager.ReleaseLeaseAsync(request.LeaseContext!.RequestId!);
                             }
                         }
-                        else
+                        finally
                         {
-                            // Try next time
-                            break;
+                            request.CancellationTokenRegistration.Dispose();
+
+                            _queue.TryDequeue(out _);
                         }
                     }
+                    else
+                    {
+                        // Try next time
+                        break;
+                    }
                 }
-                catch
-                {
-                    // 
-                }
+            }
+            catch
+            {
+                // 
             }
         }
 
@@ -245,7 +232,6 @@ namespace RedisRateLimiting
 
             _disposed = true;
 
-            _periodicTimerCts?.Dispose();
             _periodicTimer?.Dispose();
 
             while (_queue.TryDequeue(out var request))
@@ -328,6 +314,8 @@ namespace RedisRateLimiting
 
         private sealed class Request
         {
+            public CancellationToken CancellationToken { get; set; }
+
             public ConcurencyLeaseContext? LeaseContext { get; set; }
 
             public TaskCompletionSource<RateLimitLease>? TaskCompletionSource { get; set; }

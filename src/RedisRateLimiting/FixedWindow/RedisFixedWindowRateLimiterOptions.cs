@@ -9,7 +9,7 @@ namespace RedisRateLimiting
     {
         /// <summary>
         /// Specifies the time window that takes in the requests.
-        /// Must be set to a value greater than <see cref="TimeSpan.Zero" /> by the time these options are passed to the constructor of <see cref="RedisFixedWindowRateLimiter"/>.
+        /// Must be set to a value greater than <see cref="TimeSpan.Zero" /> by the time these options are passed to the constructor of <see cref="RedisFixedWindowRateLimiter{TKey}"/>.
         /// </summary>
         public TimeSpan Window { get; set; } = TimeSpan.Zero;
 
