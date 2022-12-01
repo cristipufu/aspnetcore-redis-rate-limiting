@@ -1,4 +1,7 @@
-﻿using Xunit;
+﻿using StackExchange.Redis;
+using System.Threading.RateLimiting;
+using Xunit;
+using Xunit.Sdk;
 
 namespace RedisRateLimiting.Tests.UnitTests
 {
@@ -29,6 +32,7 @@ namespace RedisRateLimiting.Tests.UnitTests
                 string.Empty,
                 new RedisConcurrencyRateLimiterOptions
                 {
+                    PermitLimit = 1,
                     QueueLimit = -1,
                 }));
 
@@ -221,6 +225,39 @@ namespace RedisRateLimiting.Tests.UnitTests
             using var lease2 = await wait2;
             Assert.True(lease1.IsAcquired);
             Assert.True(lease2.IsAcquired);
+        }
+
+        [Fact]
+        public async Task AcquireWhilePermitEmptyQueueNotEmpty()
+        {
+            using var limiter = new RedisConcurrencyRateLimiter<string>(
+                "AcquireWhilePermitEmptyQueueNotEmpty",
+                new RedisConcurrencyRateLimiterOptions
+                {
+                    PermitLimit = 1,
+                    QueueLimit = 1,
+                    TryDequeuePeriod = TimeSpan.FromHours(1),
+                    ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
+                });
+            var lease = await limiter.AcquireAsync();
+            Assert.True(lease.IsAcquired);
+
+            var waitQueued = limiter.AcquireAsync();
+            Assert.False(waitQueued.IsCompleted);
+
+            lease.Dispose();
+
+            ForceDequeue(limiter);
+
+            using var queuedLease = await waitQueued;
+            Assert.True(queuedLease.IsAcquired);
+        }
+
+        static internal void ForceDequeue(RedisConcurrencyRateLimiter<string> limiter)
+        {
+            var dequeueRequestsMethod = typeof(RedisConcurrencyRateLimiter<string>)
+                .GetMethod("TryDequeueRequestsAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+            dequeueRequestsMethod.Invoke(limiter, Array.Empty<object>());
         }
     }
 }

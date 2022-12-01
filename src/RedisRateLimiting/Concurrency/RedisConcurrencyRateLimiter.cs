@@ -53,10 +53,10 @@ namespace RedisRateLimiting
 
             if (_options.QueueLimit > 0)
             {
-                _periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+                _periodicTimer = new PeriodicTimer(_options.TryDequeuePeriod);
                 _periodicTimerCts = new CancellationTokenSource();
 
-                _ = Task.Run(() => TryDequeueRequestsAsync(_periodicTimerCts.Token), _periodicTimerCts.Token);
+                _ = StartDequeueTimerAsync(_periodicTimerCts.Token);
             }
         }
 
@@ -150,7 +150,7 @@ namespace RedisRateLimiting
             _redisManager.ReleaseLease(leaseContext.RequestId);
         }
 
-        private async Task TryDequeueRequestsAsync(CancellationToken ct)
+        private async Task StartDequeueTimerAsync(CancellationToken ct)
         {
             if (_periodicTimer == null)
             {
@@ -166,67 +166,72 @@ namespace RedisRateLimiting
 
                 try
                 {
-                    while (_queue.TryPeek(out var request))
-                    {
-                        if (request == null ||
-                            request.TaskCompletionSource == null ||
-                            request.LeaseContext?.RequestId == null)
-                        {
-                            _queue.TryDequeue(out _);
-
-                            continue;
-                        }
-
-                        if (request.TaskCompletionSource.Task.IsCompleted)
-                        {
-                            try
-                            {
-                                // The request was canceled while in the pending queue
-                                await _redisManager.ReleaseQueueLeaseAsync(request.LeaseContext.RequestId);
-                            }
-                            finally
-                            {
-                                request.CancellationTokenRegistration.Dispose();
-
-                                _queue.TryDequeue(out _);
-                            }
-
-                            continue;
-                        }
-
-                        var response = await _redisManager.TryAcquireLeaseAsync(request.LeaseContext.RequestId);
-
-                        request.LeaseContext.Count = response.Count;
-
-                        if (response.Allowed)
-                        {
-                            var pendingLease = new ConcurrencyLease(isAcquired: true, this, request.LeaseContext);
-
-                            try
-                            {
-                                if (request.TaskCompletionSource?.TrySetResult(pendingLease) == false)
-                                {
-                                    // The request was canceled after we acquired the lease
-                                    await _redisManager.ReleaseLeaseAsync(request.LeaseContext.RequestId);
-                                }
-                            }
-                            finally
-                            {
-                                request.CancellationTokenRegistration.Dispose();
-
-                                _queue.TryDequeue(out _);
-                            }
-                        }
-                        else
-                        {
-                            // Try next time
-                            break;
-                        }
-                    }
+                    await TryDequeueRequestsAsync();
                 }
                 catch
                 {
                     // 
+                }
+            }
+        }
+
+        private async Task TryDequeueRequestsAsync()
+        {
+            while (_queue.TryPeek(out var request))
+            {
+                if (request == null ||
+                    request.TaskCompletionSource == null ||
+                    request.LeaseContext?.RequestId == null)
+                {
+                    _queue.TryDequeue(out _);
+
+                    continue;
+                }
+
+                if (request.TaskCompletionSource.Task.IsCompleted)
+                {
+                    try
+                    {
+                        // The request was canceled while in the pending queue
+                        await _redisManager.ReleaseQueueLeaseAsync(request.LeaseContext.RequestId);
+                    }
+                    finally
+                    {
+                        request.CancellationTokenRegistration.Dispose();
+
+                        _queue.TryDequeue(out _);
+                    }
+
+                    continue;
+                }
+
+                var response = await _redisManager.TryAcquireLeaseAsync(request.LeaseContext.RequestId);
+
+                request.LeaseContext.Count = response.Count;
+
+                if (response.Allowed)
+                {
+                    var pendingLease = new ConcurrencyLease(isAcquired: true, this, request.LeaseContext);
+
+                    try
+                    {
+                        if (request.TaskCompletionSource?.TrySetResult(pendingLease) == false)
+                        {
+                            // The request was canceled after we acquired the lease
+                            await _redisManager.ReleaseLeaseAsync(request.LeaseContext.RequestId);
+                        }
+                    }
+                    finally
+                    {
+                        request.CancellationTokenRegistration.Dispose();
+
+                        _queue.TryDequeue(out _);
+                    }
+                }
+                else
+                {
+                    // Try next time
+                    break;
                 }
             }
         }

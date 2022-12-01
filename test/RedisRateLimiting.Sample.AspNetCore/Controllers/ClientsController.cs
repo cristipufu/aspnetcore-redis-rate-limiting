@@ -20,7 +20,7 @@ namespace RedisRateLimiting.Sample.Controllers
         [HttpGet]
         public async Task<IEnumerable<WeatherForecast>> Get()
         {
-            await Task.Delay(1000);
+            await Task.Delay(2000);
 
             return Enumerable.Range(1, 5).Select(index => new WeatherForecast
             {
