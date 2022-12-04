@@ -62,6 +62,8 @@ namespace RedisRateLimiting.Tests.UnitTests
         [Fact]
         public async Task CanAcquireAsyncResource()
         {
+            await Fixture.ClearStatisticsAsync("Test_CanAcquireAsyncResource");
+
             using var limiter = new RedisConcurrencyRateLimiter<string>(
                 "Test_CanAcquireAsyncResource",
                 new RedisConcurrencyRateLimiterOptions
@@ -81,7 +83,15 @@ namespace RedisRateLimiting.Tests.UnitTests
             lease = await limiter.AcquireAsync();
             Assert.True(lease.IsAcquired);
 
+            var stats = limiter.GetStatistics();
+            Assert.Equal(2, stats.TotalSuccessfulLeases);
+            Assert.Equal(1, stats.TotalFailedLeases);
+            Assert.Equal(0, stats.CurrentAvailablePermits);
+
             lease.Dispose();
+
+            stats = limiter.GetStatistics();
+            Assert.Equal(1, stats.CurrentAvailablePermits);
         }
 
         [Fact]
@@ -166,6 +176,8 @@ namespace RedisRateLimiting.Tests.UnitTests
         [Fact]
         public async Task QueueAvailableAfterQueueLimitHitAndResourcesBecomeAvailable()
         {
+            await Fixture.ClearStatisticsAsync("Test_QueueAvailableAfterQueueLimitHitAndResourcesBecomeAvailable");
+
             using var limiter = new RedisConcurrencyRateLimiter<string>(
                 "Test_QueueAvailableAfterQueueLimitHitAndResourcesBecomeAvailable",
                 new RedisConcurrencyRateLimiterOptions
@@ -181,9 +193,21 @@ namespace RedisRateLimiting.Tests.UnitTests
             var failedLease = await limiter.AcquireAsync();
             Assert.False(failedLease.IsAcquired);
 
+            var stats = limiter.GetStatistics();
+            Assert.Equal(1, stats.TotalSuccessfulLeases);
+            Assert.Equal(1, stats.TotalFailedLeases);
+            Assert.Equal(0, stats.CurrentAvailablePermits);
+            Assert.Equal(1, stats.CurrentQueuedCount);
+
             lease.Dispose();
             lease = await wait;
             Assert.True(lease.IsAcquired);
+
+            stats = limiter.GetStatistics();
+            Assert.Equal(2, stats.TotalSuccessfulLeases);
+            Assert.Equal(1, stats.TotalFailedLeases);
+            Assert.Equal(1, stats.CurrentAvailablePermits); // 1 from queue
+            Assert.Equal(0, stats.CurrentQueuedCount);
 
             var wait2 = limiter.AcquireAsync();
             Assert.False(wait2.IsCompleted);

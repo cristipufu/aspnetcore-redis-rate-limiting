@@ -61,7 +61,7 @@ namespace RedisRateLimiting
 
         public override RateLimiterStatistics? GetStatistics()
         {
-            throw new NotImplementedException();
+            return _redisManager.GetStatistics();
         }
 
         protected override ValueTask<RateLimitLease> AcquireAsyncCore(int permitCount, CancellationToken cancellationToken)

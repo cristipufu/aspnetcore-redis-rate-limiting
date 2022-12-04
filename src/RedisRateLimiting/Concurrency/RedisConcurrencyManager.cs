@@ -1,5 +1,6 @@
 ﻿using StackExchange.Redis;
 using System;
+using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 
 namespace RedisRateLimiting.Concurrency
@@ -10,6 +11,7 @@ namespace RedisRateLimiting.Concurrency
         private readonly RedisConcurrencyRateLimiterOptions _options;
         private readonly string RateLimitKey;
         private readonly string QueueRateLimitKey;
+        private readonly string StatsRateLimitKey;
 
         private static readonly LuaScript Script = LuaScript.Prepare(
           @"local limit = tonumber(@permit_limit)
@@ -80,7 +82,25 @@ namespace RedisRateLimiting.Concurrency
                 end
             end
 
+            if allowed
+            then
+                redis.call(""hincrby"", @stats_key, 'total_successful', 1)
+            else
+                if queued == false
+                then
+                    redis.call(""hincrby"", @stats_key, 'total_failed', 1)
+                end
+            end
+
             return { allowed, count, queued, queue_count }");
+
+        private static readonly LuaScript StatisticsScript = LuaScript.Prepare(
+          @"local count = redis.call(""zcard"", @rate_limit_key)
+            local queue_count = redis.call(""zcard"", @queue_key)
+            local total_successful_count = redis.call(""hget"", @stats_key, 'total_successful')
+            local total_failed_count = redis.call(""hget"", @stats_key, 'total_failed')
+
+            return { count, queue_count, total_successful_count, total_failed_count }");
 
         public RedisConcurrencyManager(
             string partitionKey,
@@ -91,6 +111,7 @@ namespace RedisRateLimiting.Concurrency
 
             RateLimitKey = $"rl:{partitionKey}";
             QueueRateLimitKey = $"rl:{partitionKey}:q";
+            StatsRateLimitKey = $"rl:{partitionKey}:stats";
         }
 
         internal async Task<RedisConcurrencyResponse> TryAcquireLeaseAsync(string requestId, bool tryEnqueue = false)
@@ -108,6 +129,7 @@ namespace RedisRateLimiting.Concurrency
                     queue_limit = _options.QueueLimit,
                     rate_limit_key = RateLimitKey,
                     queue_key = QueueRateLimitKey,
+                    stats_key = StatsRateLimitKey,
                     current_time = nowUnixTimeSeconds,
                     unique_id = requestId,
                 });
@@ -140,6 +162,7 @@ namespace RedisRateLimiting.Concurrency
                     queue_limit = _options.QueueLimit,
                     rate_limit_key = RateLimitKey,
                     queue_key = QueueRateLimitKey,
+                    stats_key = StatsRateLimitKey,
                     current_time = nowUnixTimeSeconds,
                     unique_id = requestId,
                 });
@@ -173,6 +196,33 @@ namespace RedisRateLimiting.Concurrency
         {
             var database = _connectionMultiplexer.GetDatabase();
             await database.SortedSetRemoveAsync(QueueRateLimitKey, requestId);
+        }
+
+        internal RateLimiterStatistics? GetStatistics()
+        {
+            var database = _connectionMultiplexer.GetDatabase();
+
+            var response = (RedisValue[]?)database.ScriptEvaluate(
+                StatisticsScript,
+                new
+                {
+                    rate_limit_key = RateLimitKey,
+                    queue_key = QueueRateLimitKey,
+                    stats_key = StatsRateLimitKey,
+                });
+
+            if (response == null)
+            {
+                return null;
+            }
+
+            return new RateLimiterStatistics
+            {
+                CurrentAvailablePermits = _options.PermitLimit + _options.QueueLimit - (long)response[0] - (long)response[1],
+                CurrentQueuedCount = (long)response[1],
+                TotalSuccessfulLeases = (long)response[2],
+                TotalFailedLeases = (long)response[3],
+            };
         }
     }
 
