@@ -33,7 +33,6 @@ PM> Install-Package RedisRateLimiting.AspNetCore
 TargetFramework: net7.0
 
 Dependencies:
-Microsoft.AspNetCore.RateLimiting (>= 7.0.0-rc.2.22476.2)
 RedisRateLimiting (>= 1.0.6)
 ```
 
