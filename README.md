@@ -22,7 +22,7 @@ PM> Install-Package RedisRateLimiting
 TargetFramework: net7.0
 
 Dependencies:
-StackExchange.Redis (>= 2.6.70)
+StackExchange.Redis (>= 2.6.86)
 System.Threading.RateLimiting (>= 7.0.0)
 ```
 
@@ -33,7 +33,7 @@ PM> Install-Package RedisRateLimiting.AspNetCore
 TargetFramework: net7.0
 
 Dependencies:
-RedisRateLimiting (>= 1.0.6)
+RedisRateLimiting (>= 1.0.7)
 ```
 
 # strategies
