@@ -14,6 +14,7 @@ namespace RedisRateLimiting.Tests.UnitTests
         [Fact]
         public void InvalidOptionsThrows()
         {
+            
             AssertExtensions.Throws<ArgumentNullException>("options", () => new RedisConcurrencyRateLimiter<string>(
                 string.Empty,
                 options: null));
