@@ -9,9 +9,9 @@ namespace RedisRateLimiting.Concurrency
     {
         private readonly IConnectionMultiplexer _connectionMultiplexer;
         private readonly RedisConcurrencyRateLimiterOptions _options;
-        private readonly string RateLimitKey;
-        private readonly string QueueRateLimitKey;
-        private readonly string StatsRateLimitKey;
+        private readonly RedisKey RateLimitKey;
+        private readonly RedisKey QueueRateLimitKey;
+        private readonly RedisKey StatsRateLimitKey;
 
         private static readonly LuaScript Script = LuaScript.Prepare(
           @"local limit = tonumber(@permit_limit)
@@ -109,9 +109,9 @@ namespace RedisRateLimiting.Concurrency
             _options = options;
             _connectionMultiplexer = options.ConnectionMultiplexerFactory!.Invoke();
 
-            RateLimitKey = $"rl:{partitionKey}";
-            QueueRateLimitKey = $"rl:{partitionKey}:q";
-            StatsRateLimitKey = $"rl:{partitionKey}:stats";
+            RateLimitKey = new RedisKey($"rl:{partitionKey}");
+            QueueRateLimitKey = new RedisKey($"rl:{partitionKey}:q");
+            StatsRateLimitKey = new RedisKey($"rl:{partitionKey}:stats");
         }
 
         internal async Task<RedisConcurrencyResponse> TryAcquireLeaseAsync(string requestId, bool tryEnqueue = false)
