@@ -9,10 +9,10 @@ namespace RedisRateLimiting.Concurrency
         private readonly IConnectionMultiplexer _connectionMultiplexer;
         private readonly RedisFixedWindowRateLimiterOptions _options;
         private readonly RedisKey RateLimitKey;
+        private readonly RedisKey RateLimitExpireKey;
 
         private static readonly LuaScript _redisScript = LuaScript.Prepare(
-          @"local expires_at_key = @rate_limit_key .. "":exp""
-            local expires_at = tonumber(redis.call(""get"", expires_at_key))
+          @"local expires_at = tonumber(redis.call(""get"", @expires_at_key))
 
             if not expires_at or expires_at < tonumber(@current_time) then
                 -- this is either a brand new window,
@@ -20,11 +20,11 @@ namespace RedisRateLimiting.Concurrency
                 -- (redis will clean it up in one more second)
                 -- initialize a new rate limit window
                 redis.call(""set"", @rate_limit_key, 0)
-                redis.call(""set"", expires_at_key, @next_expires_at)
+                redis.call(""set"", @expires_at_key, @next_expires_at)
                 -- tell Redis to clean this up _one second after_ the expires_at time (clock differences).
                 -- (Redis will only clean up these keys long after the window has passed)
                 redis.call(""expireat"", @rate_limit_key, @next_expires_at + 1)
-                redis.call(""expireat"", expires_at_key, @next_expires_at + 1)
+                redis.call(""expireat"", @expires_at_key, @next_expires_at + 1)
                 -- since the database was updated, return the new value
                 expires_at = @next_expires_at
             end
@@ -43,6 +43,7 @@ namespace RedisRateLimiting.Concurrency
             _connectionMultiplexer = options.ConnectionMultiplexerFactory!.Invoke();
 
             RateLimitKey = new RedisKey($"rl:{partitionKey}");
+            RateLimitExpireKey = new RedisKey($"rl:{partitionKey}:exp");
         }
 
         internal async Task<RedisFixedWindowResponse> TryAcquireLeaseAsync()
@@ -57,6 +58,7 @@ namespace RedisRateLimiting.Concurrency
                 new
                 {
                     rate_limit_key = RateLimitKey,
+                    expires_at_key = RateLimitExpireKey,
                     next_expires_at = now.Add(_options.Window).ToUnixTimeSeconds(),
                     current_time = nowUnixTimeSeconds,
                     increment_amount = 1D,
@@ -86,6 +88,7 @@ namespace RedisRateLimiting.Concurrency
                 new
                 {
                     rate_limit_key = RateLimitKey,
+                    expires_at_key = RateLimitExpireKey,
                     next_expires_at = now.Add(_options.Window).ToUnixTimeSeconds(),
                     current_time = nowUnixTimeSeconds,
                     increment_amount = 1D,
