@@ -8,7 +8,7 @@ namespace RedisRateLimiting.Concurrency
     {
         private readonly IConnectionMultiplexer _connectionMultiplexer;
         private readonly RedisTokenBucketRateLimiterOptions _options;
-        private readonly string RateLimitKey;
+        private readonly RedisKey RateLimitKey;
 
         private static readonly LuaScript _redisScript = LuaScript.Prepare(
           @"local rate = tonumber(@tokens_per_period)
@@ -52,7 +52,7 @@ namespace RedisRateLimiting.Concurrency
             _options = options;
             _connectionMultiplexer = options.ConnectionMultiplexerFactory!.Invoke();
 
-            RateLimitKey = $"rl:{partitionKey}";
+            RateLimitKey = new RedisKey($"rl:{partitionKey}");
         }
 
         internal async Task<RedisTokenBucketResponse> TryAcquireLeaseAsync()
