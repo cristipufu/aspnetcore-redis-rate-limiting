@@ -13,7 +13,7 @@
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<RepositoryType>git</RepositoryType>
 		<RepositoryUrl>https://github.com/cristipufu/aspnetcore-redis-rate-limiting</RepositoryUrl>
-		<Version>1.0.0</Version>
+		<Version>1.0.6</Version>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
@@ -30,6 +30,6 @@
 		<ProjectReference Include="..\RedisRateLimiting\RedisRateLimiting.csproj" />
 	</ItemGroup>
 	<ItemGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-		<PackageReference Include="RedisRateLimiting" Version="1.0.8" />
+		<PackageReference Include="RedisRateLimiting" Version="1.0.9" />
 	</ItemGroup>
 </Project>
