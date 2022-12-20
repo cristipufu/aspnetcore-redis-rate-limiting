@@ -30,6 +30,6 @@
 		<ProjectReference Include="..\RedisRateLimiting\RedisRateLimiting.csproj" />
 	</ItemGroup>
 	<ItemGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-		<PackageReference Include="RedisRateLimiting" Version="1.0.7" />
+		<PackageReference Include="RedisRateLimiting" Version="1.0.8" />
 	</ItemGroup>
 </Project>
