@@ -37,7 +37,7 @@ namespace RedisRateLimiting.Concurrency
             _options = options;
             _connectionMultiplexer = options.ConnectionMultiplexerFactory!.Invoke();
 
-            RateLimitKey = new RedisKey($"rl:{partitionKey}");
+            RateLimitKey = new RedisKey($"rl:{{{partitionKey}}}");
         }
 
         internal async Task<RedisSlidingWindowResponse> TryAcquireLeaseAsync(string requestId)

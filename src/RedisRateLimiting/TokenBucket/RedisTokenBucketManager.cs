@@ -9,6 +9,7 @@ namespace RedisRateLimiting.Concurrency
         private readonly IConnectionMultiplexer _connectionMultiplexer;
         private readonly RedisTokenBucketRateLimiterOptions _options;
         private readonly RedisKey RateLimitKey;
+        private readonly RedisKey RateLimitTimestampKey;
 
         private static readonly LuaScript _redisScript = LuaScript.Prepare(
           @"local rate = tonumber(@tokens_per_period)
@@ -22,8 +23,7 @@ namespace RedisRateLimiting.Concurrency
               current_tokens = limit
             end
 
-            local timestamp_key = @rate_limit_key .. "":ts""
-            local last_refreshed = tonumber(redis.call(""get"", timestamp_key))
+            local last_refreshed = tonumber(redis.call(""get"", @timestamp_key))
             if last_refreshed == nil then
               last_refreshed = 0
             end
@@ -41,7 +41,7 @@ namespace RedisRateLimiting.Concurrency
             local ttl = math.floor(fill_time * 2)
 
             redis.call(""setex"", @rate_limit_key, ttl, current_tokens)
-            redis.call(""setex"", timestamp_key, ttl, now)
+            redis.call(""setex"", @timestamp_key, ttl, now)
 
             return { allowed, current_tokens }");
 
@@ -52,7 +52,8 @@ namespace RedisRateLimiting.Concurrency
             _options = options;
             _connectionMultiplexer = options.ConnectionMultiplexerFactory!.Invoke();
 
-            RateLimitKey = new RedisKey($"rl:{partitionKey}");
+            RateLimitKey = new RedisKey($"rl:{{{partitionKey}}}");
+            RateLimitTimestampKey = new RedisKey($"rl:{{{partitionKey}}}:ts");
         }
 
         internal async Task<RedisTokenBucketResponse> TryAcquireLeaseAsync()
@@ -67,6 +68,7 @@ namespace RedisRateLimiting.Concurrency
                 new
                 {
                     rate_limit_key = RateLimitKey,
+                    timestamp_key = RateLimitTimestampKey,
                     current_time = nowUnixTimeSeconds,
                     tokens_per_period = _options.TokensPerPeriod,
                     token_limit = _options.TokenLimit,
@@ -97,6 +99,7 @@ namespace RedisRateLimiting.Concurrency
                 new
                 {
                     rate_limit_key = RateLimitKey,
+                    timestamp_key = RateLimitTimestampKey,
                     current_time = nowUnixTimeSeconds,
                     tokens_per_period = _options.TokensPerPeriod,
                     token_limit = _options.TokenLimit,

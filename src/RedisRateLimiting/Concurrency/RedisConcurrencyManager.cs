@@ -86,7 +86,7 @@ namespace RedisRateLimiting.Concurrency
             then
                 redis.call(""hincrby"", @stats_key, 'total_successful', 1)
             else
-                if queued == false
+                if queued == false and try_enqueue == 1
                 then
                     redis.call(""hincrby"", @stats_key, 'total_failed', 1)
                 end
@@ -109,9 +109,9 @@ namespace RedisRateLimiting.Concurrency
             _options = options;
             _connectionMultiplexer = options.ConnectionMultiplexerFactory!.Invoke();
 
-            RateLimitKey = new RedisKey($"rl:{partitionKey}");
-            QueueRateLimitKey = new RedisKey($"rl:{partitionKey}:q");
-            StatsRateLimitKey = new RedisKey($"rl:{partitionKey}:stats");
+            RateLimitKey = new RedisKey($"rl:{{{partitionKey}}}");
+            QueueRateLimitKey = new RedisKey($"rl:{{{partitionKey}}}:q");
+            StatsRateLimitKey = new RedisKey($"rl:{{{partitionKey}}}:stats");
         }
 
         internal async Task<RedisConcurrencyResponse> TryAcquireLeaseAsync(string requestId, bool tryEnqueue = false)

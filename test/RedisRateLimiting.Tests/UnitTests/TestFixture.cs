@@ -25,7 +25,7 @@ namespace RedisRateLimiting.Tests.UnitTests
 
         public async Task ClearStatisticsAsync(string partitionKey)
         {
-            var key = $"rl:{partitionKey}:stats";
+            var key = $"rl:{{{partitionKey}}}:stats";
             var database = ConnectionMultiplexer.GetDatabase();
             await database.KeyDeleteAsync(key);
         }

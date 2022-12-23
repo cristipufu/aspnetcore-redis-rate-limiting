@@ -190,6 +190,8 @@ namespace RedisRateLimiting.Tests.UnitTests
             var lease = limiter.AttemptAcquire();
             var wait = limiter.AcquireAsync();
 
+            await Task.Delay(1000);
+
             var failedLease = await limiter.AcquireAsync();
             Assert.False(failedLease.IsAcquired);
 
