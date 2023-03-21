@@ -38,10 +38,17 @@ namespace RedisRateLimiting.Concurrency
             -- Now we have all the info we need to calculate the current tokens based on the elapsed time.
             current_tokens = math.min(limit, current_tokens + (periods_since_last_refreshed * rate))
 
+            -- We are also able to calculate the time of the last replenishment, which we store and use
+            -- to calculate the time after which a client may retry if they are rate limited.
+            local time_of_last_replenishment = now
+            if last_refreshed > 0 then
+                time_of_last_replenishment = last_refreshed + (periods_since_last_refreshed * period)
+            end
+
             -- If the bucket contains enough tokens for the current request, we remove the tokens.
             local allowed = current_tokens >= requested
             if allowed then
-               current_tokens = current_tokens - requested
+                current_tokens = current_tokens - requested
             end
 
             -- In order to remove rate limit keys automatically from the database, we calculate a TTL
@@ -52,16 +59,17 @@ namespace RedisRateLimiting.Concurrency
             -- We only store the new state in the database if the request was granted.
             -- This avoids rounding issues and edge cases which can occur if many requests are rate limited.
             if allowed then
-                local time_of_last_replenishment = now
-                if last_refreshed > 0 then
-                    time_of_last_replenishment = last_refreshed + (periods_since_last_refreshed * period)
-                end
-
                 redis.call('SET', @rate_limit_key, current_tokens, 'EX', ttl)
                 redis.call('SET', @timestamp_key, time_of_last_replenishment, 'EX', ttl)
             end
 
-            return { allowed, current_tokens }");
+            -- Before we return, we can now also calculate when the client may retry again if they are rate limited.
+            local retry_after = 0
+            if not allowed then
+                retry_after = period - (now - time_of_last_replenishment)
+            end
+
+            return { allowed, current_tokens, retry_after }");
 
         public RedisTokenBucketManager(
             string partitionKey,
@@ -99,6 +107,7 @@ namespace RedisRateLimiting.Concurrency
             {
                 result.Allowed = (bool)response[0];
                 result.Count = (long)response[1];
+                result.RetryAfter = (int)Math.Ceiling((decimal)response[2] / 1000);
             }
 
             return result;
@@ -126,6 +135,7 @@ namespace RedisRateLimiting.Concurrency
             {
                 result.Allowed = (bool)response[0];
                 result.Count = (long)response[1];
+                result.RetryAfter = (int)Math.Ceiling((decimal)response[2] / 1000);
             }
 
             return result;
@@ -136,5 +146,6 @@ namespace RedisRateLimiting.Concurrency
     {
         internal bool Allowed { get; set; }
         internal long Count { get; set; }
+        internal int RetryAfter { get; set; }
     }
 }
