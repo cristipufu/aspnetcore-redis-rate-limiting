@@ -59,8 +59,8 @@ namespace RedisRateLimiting.Concurrency
             -- We only store the new state in the database if the request was granted.
             -- This avoids rounding issues and edge cases which can occur if many requests are rate limited.
             if allowed then
-                redis.call('SET', @rate_limit_key, current_tokens, 'EX', ttl)
-                redis.call('SET', @timestamp_key, time_of_last_replenishment, 'EX', ttl)
+                redis.call('SET', @rate_limit_key, current_tokens, 'PX', ttl)
+                redis.call('SET', @timestamp_key, time_of_last_replenishment, 'PX', ttl)
             end
 
             -- Before we return, we can now also calculate when the client may retry again if they are rate limited.
