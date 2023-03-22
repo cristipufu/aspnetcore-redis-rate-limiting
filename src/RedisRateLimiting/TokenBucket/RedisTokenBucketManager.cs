@@ -53,7 +53,8 @@ namespace RedisRateLimiting.Concurrency
 
             -- In order to remove rate limit keys automatically from the database, we calculate a TTL
             -- based on the worst-case scenario for the bucket to fill up again.
-            local periods_until_full = limit / rate
+            -- The worst case is when the bucket is empty and the last replenisment adds less tokens than available.
+            local periods_until_full = math.ceil(limit / rate)
             local ttl = math.ceil(periods_until_full * period)
 
             -- We only store the new state in the database if the request was granted.
