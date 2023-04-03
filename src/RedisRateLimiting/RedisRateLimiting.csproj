@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<OutputType>Library</OutputType>
@@ -27,7 +27,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="System.Threading.RateLimiting" Version="7.0.0" />
-		<PackageReference Include="StackExchange.Redis" Version="2.6.96" />
+		<PackageReference Include="StackExchange.Redis" Version="2.6.104" />
 	</ItemGroup>
 
 </Project>
