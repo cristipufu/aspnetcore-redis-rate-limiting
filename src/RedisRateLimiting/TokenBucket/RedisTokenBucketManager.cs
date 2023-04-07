@@ -56,7 +56,7 @@ namespace RedisRateLimiting.Concurrency
             RateLimitTimestampKey = new RedisKey($"rl:{{{partitionKey}}}:ts");
         }
 
-        internal async Task<RedisTokenBucketResponse> TryAcquireLeaseAsync()
+        internal async Task<RedisTokenBucketResponse> TryAcquireLeaseAsync(int permitCount)
         {
             var now = DateTimeOffset.UtcNow;
             var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
@@ -73,7 +73,7 @@ namespace RedisRateLimiting.Concurrency
                     tokens_per_period = _options.TokensPerPeriod,
                     token_limit = _options.TokenLimit,
                     replenish_period = _options.ReplenishmentPeriod.TotalSeconds,
-                    permit_count = 1D,
+                    permit_count = permitCount,
                 });
 
             var result = new RedisTokenBucketResponse();
@@ -87,7 +87,7 @@ namespace RedisRateLimiting.Concurrency
             return result;
         }
 
-        internal RedisTokenBucketResponse TryAcquireLease()
+        internal RedisTokenBucketResponse TryAcquireLease(int permitCount)
         {
             var now = DateTimeOffset.UtcNow;
             var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
@@ -104,7 +104,7 @@ namespace RedisRateLimiting.Concurrency
                     tokens_per_period = _options.TokensPerPeriod,
                     token_limit = _options.TokenLimit,
                     replenish_period = _options.ReplenishmentPeriod.TotalSeconds,
-                    permit_count = 1D,
+                    permit_count = permitCount,
                 });
 
             var result = new RedisTokenBucketResponse();
