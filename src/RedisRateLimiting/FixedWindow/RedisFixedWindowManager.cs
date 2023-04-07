@@ -13,6 +13,9 @@ namespace RedisRateLimiting.Concurrency
 
         private static readonly LuaScript _redisScript = LuaScript.Prepare(
           @"local expires_at = tonumber(redis.call(""get"", @expires_at_key))
+            local current = tonumber(redis.call(""get"", @rate_limit_key))
+            local requested = tonumber(@increment_amount)
+            local limit = tonumber(@permit_limit)
 
             if not expires_at or expires_at < tonumber(@current_time) then
                 -- this is either a brand new window,
@@ -27,13 +30,19 @@ namespace RedisRateLimiting.Concurrency
                 redis.call(""expireat"", @expires_at_key, @next_expires_at + 1)
                 -- since the database was updated, return the new value
                 expires_at = @next_expires_at
+                current = 0
             end
 
-            -- now that the window either already exists or it was freshly initialized,
-            -- increment the counter(`incrby` returns a number)
-            local current = redis.call(""incrby"", @rate_limit_key, @increment_amount)
+            local allowed = current + requested <= limit
 
-            return { current, expires_at }");
+            if allowed
+            then
+                -- now that the window either already exists or it was freshly initialized,
+                -- increment the counter(`incrby` returns a number)
+                current = redis.call(""incrby"", @rate_limit_key, @increment_amount)
+            end
+
+            return { current, expires_at, allowed }");
 
         public RedisFixedWindowManager(
             string partitionKey,
@@ -46,7 +55,7 @@ namespace RedisRateLimiting.Concurrency
             RateLimitExpireKey = new RedisKey($"rl:{{{partitionKey}}}:exp");
         }
 
-        internal async Task<RedisFixedWindowResponse> TryAcquireLeaseAsync()
+        internal async Task<RedisFixedWindowResponse> TryAcquireLeaseAsync(int permitCount)
         {
             var now = DateTimeOffset.UtcNow;
             var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
@@ -59,9 +68,10 @@ namespace RedisRateLimiting.Concurrency
                 {
                     rate_limit_key = RateLimitKey,
                     expires_at_key = RateLimitExpireKey,
+                    permit_limit = _options.PermitLimit,
                     next_expires_at = now.Add(_options.Window).ToUnixTimeSeconds(),
                     current_time = nowUnixTimeSeconds,
-                    increment_amount = 1D,
+                    increment_amount = permitCount,
                 });
 
             var result = new RedisFixedWindowResponse();
@@ -70,13 +80,14 @@ namespace RedisRateLimiting.Concurrency
             {
                 result.Count = (long)response[0];
                 result.ExpiresAt = (long)response[1];
+                result.Allowed = (bool)response[2];
                 result.RetryAfter = TimeSpan.FromSeconds(result.ExpiresAt - nowUnixTimeSeconds);
             }
 
             return result;
         }
 
-        internal RedisFixedWindowResponse TryAcquireLease()
+        internal RedisFixedWindowResponse TryAcquireLease(int permitCount)
         {
             var now = DateTimeOffset.UtcNow;
             var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
@@ -89,9 +100,10 @@ namespace RedisRateLimiting.Concurrency
                 {
                     rate_limit_key = RateLimitKey,
                     expires_at_key = RateLimitExpireKey,
+                    permit_limit = _options.PermitLimit,
                     next_expires_at = now.Add(_options.Window).ToUnixTimeSeconds(),
                     current_time = nowUnixTimeSeconds,
-                    increment_amount = 1D,
+                    increment_amount = permitCount,
                 });
 
             var result = new RedisFixedWindowResponse();
@@ -100,6 +112,7 @@ namespace RedisRateLimiting.Concurrency
             {
                 result.Count = (long)response[0];
                 result.ExpiresAt = (long)response[1];
+                result.Allowed = (bool)response[2];
                 result.RetryAfter = TimeSpan.FromSeconds(result.ExpiresAt - nowUnixTimeSeconds);
             }
 
@@ -112,5 +125,6 @@ namespace RedisRateLimiting.Concurrency
         internal long ExpiresAt { get; set; }
         internal TimeSpan RetryAfter { get; set; }
         internal long Count { get; set; }
+        internal bool Allowed { get; set; }
     }
 }
