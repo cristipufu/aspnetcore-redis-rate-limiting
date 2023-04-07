@@ -1,5 +1,6 @@
 ﻿using StackExchange.Redis;
 using System;
+using System.Collections.Generic;
 using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 
@@ -18,6 +19,7 @@ namespace RedisRateLimiting.Concurrency
             local queue_limit = tonumber(@queue_limit)
             local try_enqueue = tonumber(@try_enqueue)
             local timestamp = tonumber(@current_time)
+            local requested = tonumber(@permit_count)
             -- max seconds it takes to complete a request
             local ttl = 60
 
@@ -29,9 +31,18 @@ namespace RedisRateLimiting.Concurrency
             end
 
             local count = redis.call(""zcard"", @rate_limit_key)
-            local allowed = count < limit
+            local allowed = count + requested <= limit
             local queued = false
             local queue_count = 0
+
+            local addparams = {}
+            local remparams = {}
+            for i=1,requested do
+                local index = i*2
+                addparams[index-1]=timestamp
+                addparams[index]=@unique_id..':'..tostring(i)
+                remparams[i]=addparams[index]
+            end
 
             if allowed
             then
@@ -45,23 +56,23 @@ namespace RedisRateLimiting.Concurrency
                 if queue_count == 0 or try_enqueue == 0
                 then
 
-                    redis.call(""zadd"", @rate_limit_key, timestamp, @unique_id)
+                    redis.call(""zadd"", @rate_limit_key, unpack(addparams))
 
                     if queue_limit > 0
                     then
                         -- remove from pending queue
-                        redis.call(""zrem"", @queue_key, @unique_id)
+                        redis.call(""zrem"", @queue_key, unpack(remparams))
                     end
                 
                 else
                     -- queue the current request next in line if we have any requests in the pending queue
                     allowed = false
 
-                    queued = queue_count + count < limit + queue_limit
+                    queued = queue_count + count + requested <= limit + queue_limit
 
                     if queued
                     then
-                        redis.call(""zadd"", @queue_key, timestamp, @unique_id)
+                        redis.call(""zadd"", @queue_key, unpack(addparams))
                     end
 
                 end
@@ -72,11 +83,11 @@ namespace RedisRateLimiting.Concurrency
                 then
 
                     queue_count = redis.call(""zcard"", @queue_key)
-                    queued = queue_count < queue_limit
+                    queued = queue_count + requested <= queue_limit
 
                     if queued
                     then
-                        redis.call(""zadd"", @queue_key, timestamp, @unique_id)
+                        redis.call(""zadd"", @queue_key, unpack(addparams))
                     end
 
                 end
@@ -84,11 +95,11 @@ namespace RedisRateLimiting.Concurrency
 
             if allowed
             then
-                redis.call(""hincrby"", @stats_key, 'total_successful', 1)
+                redis.call(""hincrby"", @stats_key, 'total_successful', requested)
             else
                 if queued == false and try_enqueue == 1
                 then
-                    redis.call(""hincrby"", @stats_key, 'total_failed', 1)
+                    redis.call(""hincrby"", @stats_key, 'total_failed', requested)
                 end
             end
 
@@ -114,7 +125,7 @@ namespace RedisRateLimiting.Concurrency
             StatsRateLimitKey = new RedisKey($"rl:{{{partitionKey}}}:stats");
         }
 
-        internal async Task<RedisConcurrencyResponse> TryAcquireLeaseAsync(string requestId, bool tryEnqueue = false)
+        internal async Task<RedisConcurrencyResponse> TryAcquireLeaseAsync(string requestId, int permitCount, bool tryEnqueue = false)
         {
             var nowUnixTimeSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
@@ -132,6 +143,7 @@ namespace RedisRateLimiting.Concurrency
                     stats_key = StatsRateLimitKey,
                     current_time = nowUnixTimeSeconds,
                     unique_id = requestId,
+                    permit_count = permitCount
                 });
 
             var result = new RedisConcurrencyResponse();
@@ -147,7 +159,7 @@ namespace RedisRateLimiting.Concurrency
             return result;
         }
 
-        internal RedisConcurrencyResponse TryAcquireLease(string requestId, bool tryEnqueue = false)
+        internal RedisConcurrencyResponse TryAcquireLease(string requestId, int permitCount, bool tryEnqueue = false)
         {
             var nowUnixTimeSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
@@ -165,6 +177,7 @@ namespace RedisRateLimiting.Concurrency
                     stats_key = StatsRateLimitKey,
                     current_time = nowUnixTimeSeconds,
                     unique_id = requestId,
+                    permit_count = permitCount
                 });
 
             var result = new RedisConcurrencyResponse();
@@ -180,22 +193,41 @@ namespace RedisRateLimiting.Concurrency
             return result;
         }
 
-        internal void ReleaseLease(string requestId)
+        internal void ReleaseLease(string requestId, int permitCount)
         {
             var database = _connectionMultiplexer.GetDatabase();
-            database.SortedSetRemove(RateLimitKey, requestId);
+
+            for (var i = 1; i <= permitCount; i++)
+            {
+                database.SortedSetRemove(RateLimitKey, $"{requestId}:{i}");
+            }
         }
 
-        internal async Task ReleaseLeaseAsync(string requestId)
+        internal Task ReleaseLeaseAsync(string requestId, int permitCount)
         {
             var database = _connectionMultiplexer.GetDatabase();
-            await database.SortedSetRemoveAsync(RateLimitKey, requestId);
+            var tasks = new List<Task>(permitCount);
+
+            for (var i = 1; i <= permitCount; i++)
+            {
+                tasks.Add(database.SortedSetRemoveAsync(RateLimitKey, $"{requestId}:{i}"));
+            }
+
+            return Task.WhenAll(tasks);
         }
 
-        internal async Task ReleaseQueueLeaseAsync(string requestId)
+        internal Task ReleaseQueueLeaseAsync(string requestId, int permitCount)
         {
             var database = _connectionMultiplexer.GetDatabase();
-            await database.SortedSetRemoveAsync(QueueRateLimitKey, requestId);
+
+            var tasks = new List<Task>(permitCount);
+
+            for (var i = 1; i <= permitCount; i++)
+            {
+                tasks.Add(database.SortedSetRemoveAsync(QueueRateLimitKey, $"{requestId}:{i}"));
+            }
+
+            return Task.WhenAll(tasks);
         }
 
         internal RateLimiterStatistics? GetStatistics()

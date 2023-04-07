@@ -71,7 +71,7 @@ namespace RedisRateLimiting
                 throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.PermitLimit));
             }
 
-            return AcquireAsyncCoreInternal(cancellationToken);
+            return AcquireAsyncCoreInternal(permitCount, cancellationToken);
         }
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
@@ -85,9 +85,10 @@ namespace RedisRateLimiting
             {
                 Limit = _options.PermitLimit,
                 RequestId = Guid.NewGuid().ToString(),
+                PermitCount = permitCount
             };
 
-            var response = _redisManager.TryAcquireLease(leaseContext.RequestId);
+            var response = _redisManager.TryAcquireLease(leaseContext.RequestId, permitCount);
 
             leaseContext.Count = response.Count;
 
@@ -99,15 +100,16 @@ namespace RedisRateLimiting
             return new ConcurrencyLease(isAcquired: false, this, leaseContext);
         }
 
-        private async ValueTask<RateLimitLease> AcquireAsyncCoreInternal(CancellationToken cancellationToken)
+        private async ValueTask<RateLimitLease> AcquireAsyncCoreInternal(int permitCount, CancellationToken cancellationToken)
         {
             var leaseContext = new ConcurencyLeaseContext
             {
                 Limit = _options.PermitLimit,
                 RequestId = Guid.NewGuid().ToString(),
+                PermitCount = permitCount
             };
 
-            var response = await _redisManager.TryAcquireLeaseAsync(leaseContext.RequestId, tryEnqueue: true);
+            var response = await _redisManager.TryAcquireLeaseAsync(leaseContext.RequestId, permitCount, tryEnqueue: true);
 
             leaseContext.Count = response.Count;
 
@@ -148,7 +150,7 @@ namespace RedisRateLimiting
         {
             if (leaseContext.RequestId is null) return;
 
-            _redisManager.ReleaseLease(leaseContext.RequestId);
+            _redisManager.ReleaseLease(leaseContext.RequestId, leaseContext.PermitCount);
         }
 
         private async Task StartDequeueTimerAsync(PeriodicTimer periodicTimer)
@@ -170,7 +172,7 @@ namespace RedisRateLimiting
                         try
                         {
                             // The request was canceled while in the pending queue
-                            await _redisManager.ReleaseQueueLeaseAsync(request.LeaseContext!.RequestId!);
+                            await _redisManager.ReleaseQueueLeaseAsync(request.LeaseContext!.RequestId!, request.LeaseContext!.PermitCount);
                         }
                         finally
                         {
@@ -182,7 +184,7 @@ namespace RedisRateLimiting
                         continue;
                     }
 
-                    var response = await _redisManager.TryAcquireLeaseAsync(request.LeaseContext!.RequestId!);
+                    var response = await _redisManager.TryAcquireLeaseAsync(request.LeaseContext!.RequestId!, request.LeaseContext!.PermitCount);
 
                     request.LeaseContext.Count = response.Count;
 
@@ -195,7 +197,7 @@ namespace RedisRateLimiting
                             if (request.TaskCompletionSource?.TrySetResult(pendingLease) == false)
                             {
                                 // The request was canceled after we acquired the lease
-                                await _redisManager.ReleaseLeaseAsync(request.LeaseContext!.RequestId!);
+                                await _redisManager.ReleaseLeaseAsync(request.LeaseContext!.RequestId!, request.LeaseContext!.PermitCount);
                             }
                         }
                         finally
@@ -257,6 +259,8 @@ namespace RedisRateLimiting
             public long Count { get; set; }
 
             public long Limit { get; set; }
+
+            public int PermitCount { get; set; }
         }
 
         private sealed class ConcurrencyLease : RateLimitLease
