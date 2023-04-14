@@ -78,6 +78,8 @@ namespace RedisRateLimiting.Tests.UnitTests
         [Fact]
         public async Task CanAcquireAsyncResource()
         {
+            await Fixture.ClearStatisticsAsync("Test_CanAcquireAsyncResource_SW");
+
             using var limiter = new RedisSlidingWindowRateLimiter<string>(
                 "Test_CanAcquireAsyncResource_SW",
                 new RedisSlidingWindowRateLimiterOptions
@@ -92,6 +94,17 @@ namespace RedisRateLimiting.Tests.UnitTests
 
             using var lease2 = await limiter.AcquireAsync();
             Assert.False(lease2.IsAcquired);
+
+            var stats = limiter.GetStatistics()!;
+            Assert.Equal(1, stats.TotalSuccessfulLeases);
+            Assert.Equal(1, stats.TotalFailedLeases);
+            Assert.Equal(0, stats.CurrentAvailablePermits);
+
+            lease.Dispose();
+            lease2.Dispose();
+
+            stats = limiter.GetStatistics()!;
+            Assert.Equal(0, stats.CurrentAvailablePermits);
         }
     }
 }
