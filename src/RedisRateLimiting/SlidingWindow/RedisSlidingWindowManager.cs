@@ -10,7 +10,7 @@ namespace RedisRateLimiting.Concurrency
         private readonly IConnectionMultiplexer _connectionMultiplexer;
         private readonly RedisSlidingWindowRateLimiterOptions _options;
         private readonly RedisKey RateLimitKey;
-        private readonly string StatsRateLimitKey;
+        private readonly RedisKey StatsRateLimitKey;
 
         private static readonly LuaScript _redisScript = LuaScript.Prepare(
           @"local limit = tonumber(@permit_limit)
@@ -54,7 +54,7 @@ namespace RedisRateLimiting.Concurrency
             _connectionMultiplexer = options.ConnectionMultiplexerFactory!.Invoke();
 
             RateLimitKey = new RedisKey($"rl:{{{partitionKey}}}");
-            StatsRateLimitKey = $"rl:{partitionKey}:stats";
+            StatsRateLimitKey = new RedisKey($"rl:{{{partitionKey}}}:stats");
         }
 
         internal async Task<RedisSlidingWindowResponse> TryAcquireLeaseAsync(string requestId)
