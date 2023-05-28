@@ -11,7 +11,7 @@ namespace RedisRateLimiting.Concurrency
         private readonly RedisKey RateLimitKey;
         private readonly RedisKey RateLimitExpireKey;
 
-        private static readonly LuaScript _redisScript = LuaScript.Prepare(
+        private static readonly LuaScript Script = LuaScript.Prepare(
           @"local expires_at = tonumber(redis.call(""get"", @expires_at_key))
 
             if not expires_at or expires_at < tonumber(@current_time) then
@@ -54,14 +54,14 @@ namespace RedisRateLimiting.Concurrency
             var database = _connectionMultiplexer.GetDatabase();
 
             var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
-                _redisScript,
+                Script,
                 new
                 {
                     rate_limit_key = RateLimitKey,
                     expires_at_key = RateLimitExpireKey,
-                    next_expires_at = now.Add(_options.Window).ToUnixTimeSeconds(),
-                    current_time = nowUnixTimeSeconds,
-                    increment_amount = 1D,
+                    next_expires_at = (RedisValue)now.Add(_options.Window).ToUnixTimeSeconds(),
+                    current_time = (RedisValue)nowUnixTimeSeconds,
+                    increment_amount = (RedisValue)1D,
                 });
 
             var result = new RedisFixedWindowResponse();
@@ -84,14 +84,14 @@ namespace RedisRateLimiting.Concurrency
             var database = _connectionMultiplexer.GetDatabase();
 
             var response = (RedisValue[]?)database.ScriptEvaluate(
-                _redisScript,
+                Script,
                 new
                 {
                     rate_limit_key = RateLimitKey,
                     expires_at_key = RateLimitExpireKey,
-                    next_expires_at = now.Add(_options.Window).ToUnixTimeSeconds(),
-                    current_time = nowUnixTimeSeconds,
-                    increment_amount = 1D,
+                    next_expires_at = (RedisValue)now.Add(_options.Window).ToUnixTimeSeconds(),
+                    current_time = (RedisValue)nowUnixTimeSeconds,
+                    increment_amount = (RedisValue)1D,
                 });
 
             var result = new RedisFixedWindowResponse();

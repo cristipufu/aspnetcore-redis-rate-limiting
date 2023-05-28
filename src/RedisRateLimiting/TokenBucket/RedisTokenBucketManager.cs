@@ -11,7 +11,7 @@ namespace RedisRateLimiting.Concurrency
         private readonly RedisKey RateLimitKey;
         private readonly RedisKey RateLimitTimestampKey;
 
-        private static readonly LuaScript _redisScript = LuaScript.Prepare(@"
+        private static readonly LuaScript Script = LuaScript.Prepare(@"
             -- Prepare the input and force the correct data types.
             local limit = tonumber(@token_limit)
             local rate = tonumber(@tokens_per_period)
@@ -85,17 +85,14 @@ namespace RedisRateLimiting.Concurrency
 
         internal async Task<RedisTokenBucketResponse> TryAcquireLeaseAsync()
         {
-            var now = DateTimeOffset.UtcNow;
-            var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
-
             var database = _connectionMultiplexer.GetDatabase();
 
             var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
-                _redisScript,
+                Script,
                 new
                 {
-                    rate_limit_key = (RedisKey)RateLimitKey,
-                    timestamp_key = (RedisKey)RateLimitTimestampKey,
+                    rate_limit_key = RateLimitKey,
+                    timestamp_key = RateLimitTimestampKey,
                     tokens_per_period = (RedisValue)_options.TokensPerPeriod,
                     token_limit = (RedisValue)_options.TokenLimit,
                     replenish_period = (RedisValue)_options.ReplenishmentPeriod.TotalMilliseconds,
@@ -119,11 +116,11 @@ namespace RedisRateLimiting.Concurrency
             var database = _connectionMultiplexer.GetDatabase();
 
             var response = (RedisValue[]?)database.ScriptEvaluate(
-                _redisScript,
+                Script,
                 new
                 {
-                    rate_limit_key = (RedisKey)RateLimitKey,
-                    timestamp_key = (RedisKey)RateLimitTimestampKey,
+                    rate_limit_key = RateLimitKey,
+                    timestamp_key = RateLimitTimestampKey,
                     tokens_per_period = (RedisValue)_options.TokensPerPeriod,
                     token_limit = (RedisValue)_options.TokenLimit,
                     replenish_period = (RedisValue)_options.ReplenishmentPeriod.TotalMilliseconds,

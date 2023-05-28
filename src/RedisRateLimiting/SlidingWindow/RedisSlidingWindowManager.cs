@@ -12,7 +12,7 @@ namespace RedisRateLimiting.Concurrency
         private readonly RedisKey RateLimitKey;
         private readonly RedisKey StatsRateLimitKey;
 
-        private static readonly LuaScript _redisScript = LuaScript.Prepare(
+        private static readonly LuaScript Script = LuaScript.Prepare(
           @"local limit = tonumber(@permit_limit)
             local timestamp = tonumber(@current_time)
             local window = tonumber(@window)
@@ -65,15 +65,15 @@ namespace RedisRateLimiting.Concurrency
             var database = _connectionMultiplexer.GetDatabase();
 
             var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
-                _redisScript,
+                Script,
                 new
                 {
                     rate_limit_key = RateLimitKey,
-                    permit_limit = _options.PermitLimit,
-                    window = _options.Window.TotalSeconds,
                     stats_key = StatsRateLimitKey,
-                    current_time = nowUnixTimeSeconds,
-                    unique_id = requestId,
+                    permit_limit = (RedisValue)_options.PermitLimit,
+                    window = (RedisValue)_options.Window.TotalSeconds,
+                    current_time = (RedisValue)nowUnixTimeSeconds,
+                    unique_id = (RedisValue)requestId,
                 });
 
             var result = new RedisSlidingWindowResponse();
@@ -95,15 +95,15 @@ namespace RedisRateLimiting.Concurrency
             var database = _connectionMultiplexer.GetDatabase();
 
             var response = (RedisValue[]?)database.ScriptEvaluate(
-               _redisScript,
+               Script,
                new
                {
                    rate_limit_key = RateLimitKey,
-                   permit_limit = _options.PermitLimit,
-                   window = _options.Window.TotalSeconds,
                    stats_key = StatsRateLimitKey,
-                   current_time = nowUnixTimeSeconds,
-                   unique_id = requestId,
+                   permit_limit = (RedisValue)_options.PermitLimit,
+                   window = (RedisValue)_options.Window.TotalSeconds,
+                   current_time = (RedisValue)nowUnixTimeSeconds,
+                   unique_id = (RedisValue)requestId,
                });
 
             var result = new RedisSlidingWindowResponse();
