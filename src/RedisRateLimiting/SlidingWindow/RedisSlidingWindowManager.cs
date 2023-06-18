@@ -28,7 +28,8 @@ namespace RedisRateLimiting.Concurrency
                 redis.call(""zadd"", @rate_limit_key, timestamp, @unique_id)
             end
 
-            redis.call(""expireat"", @rate_limit_key, timestamp + window + 1)
+            local expireAtMilliseconds = math.floor((timestamp + window) * 1000 + 1);
+            redis.call(""pexpireat"", @rate_limit_key, expireAtMilliseconds)
 
             if allowed
             then
@@ -60,7 +61,7 @@ namespace RedisRateLimiting.Concurrency
         internal async Task<RedisSlidingWindowResponse> TryAcquireLeaseAsync(string requestId)
         {
             var now = DateTimeOffset.UtcNow;
-            var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
+            double nowUnixTimeSeconds = now.ToUnixTimeMilliseconds() / 1000.0;
 
             var database = _connectionMultiplexer.GetDatabase();
 
@@ -90,7 +91,7 @@ namespace RedisRateLimiting.Concurrency
         internal RedisSlidingWindowResponse TryAcquireLease(string requestId)
         {
             var now = DateTimeOffset.UtcNow;
-            var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
+            double nowUnixTimeSeconds = now.ToUnixTimeMilliseconds() / 1000.0;
 
             var database = _connectionMultiplexer.GetDatabase();
 
