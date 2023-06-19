@@ -135,15 +135,15 @@ namespace RedisRateLimiting.Concurrency
                 Script,
                 new
                 {
-                    permit_limit = _options.PermitLimit,
-                    try_enqueue = tryEnqueue ? 1 : 0,
-                    queue_limit = _options.QueueLimit,
                     rate_limit_key = RateLimitKey,
                     queue_key = QueueRateLimitKey,
                     stats_key = StatsRateLimitKey,
-                    current_time = nowUnixTimeSeconds,
-                    unique_id = requestId,
-                    permit_count = permitCount
+                    permit_limit = (RedisValue)_options.PermitLimit,
+                    try_enqueue = (RedisValue)(tryEnqueue ? 1 : 0),
+                    permit_count = (RedisValue)permitCount,
+                    queue_limit = (RedisValue)_options.QueueLimit,
+                    current_time = (RedisValue)nowUnixTimeSeconds,
+                    unique_id = (RedisValue)requestId,
                 });
 
             var result = new RedisConcurrencyResponse();
@@ -169,15 +169,15 @@ namespace RedisRateLimiting.Concurrency
                 Script,
                 new
                 {
-                    permit_limit = _options.PermitLimit,
-                    try_enqueue = tryEnqueue ? 1 : 0,
-                    queue_limit = _options.QueueLimit,
                     rate_limit_key = RateLimitKey,
                     queue_key = QueueRateLimitKey,
                     stats_key = StatsRateLimitKey,
-                    current_time = nowUnixTimeSeconds,
-                    unique_id = requestId,
-                    permit_count = permitCount
+                    permit_limit = (RedisValue)_options.PermitLimit,
+                    try_enqueue = (RedisValue)(tryEnqueue ? 1 : 0),
+                    permit_count = (RedisValue)permitCount,
+                    queue_limit = (RedisValue)_options.QueueLimit,
+                    current_time = (RedisValue)nowUnixTimeSeconds,
+                    unique_id = (RedisValue)requestId,
                 });
 
             var result = new RedisConcurrencyResponse();

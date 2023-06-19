@@ -12,7 +12,7 @@ namespace RedisRateLimiting.Concurrency
         private readonly RedisKey RateLimitKey;
         private readonly RedisKey StatsRateLimitKey;
 
-        private static readonly LuaScript _redisScript = LuaScript.Prepare(
+        private static readonly LuaScript Script = LuaScript.Prepare(
           @"local limit = tonumber(@permit_limit)
             local timestamp = tonumber(@current_time)
             local window = tonumber(@window)
@@ -36,7 +36,8 @@ namespace RedisRateLimiting.Concurrency
                 redis.call(""zadd"", @rate_limit_key, unpack(zaddparams))
             end
 
-            redis.call(""expireat"", @rate_limit_key, timestamp + window + 1)
+            local expireAtMilliseconds = math.floor((timestamp + window) * 1000 + 1);
+            redis.call(""pexpireat"", @rate_limit_key, expireAtMilliseconds)
 
             if allowed
             then
@@ -68,21 +69,21 @@ namespace RedisRateLimiting.Concurrency
         internal async Task<RedisSlidingWindowResponse> TryAcquireLeaseAsync(string requestId, int permitCount)
         {
             var now = DateTimeOffset.UtcNow;
-            var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
+            double nowUnixTimeSeconds = now.ToUnixTimeMilliseconds() / 1000.0;
 
             var database = _connectionMultiplexer.GetDatabase();
 
             var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
-                _redisScript,
+                Script,
                 new
                 {
                     rate_limit_key = RateLimitKey,
-                    permit_limit = _options.PermitLimit,
-                    window = _options.Window.TotalSeconds,
                     stats_key = StatsRateLimitKey,
-                    current_time = nowUnixTimeSeconds,
-                    unique_id = requestId,
-                    permit_count = permitCount
+                    permit_limit = (RedisValue)_options.PermitLimit,
+                    window = (RedisValue)_options.Window.TotalSeconds,
+                    permit_count = (RedisValue)permitCount,
+                    current_time = (RedisValue)nowUnixTimeSeconds,
+                    unique_id = (RedisValue)requestId,
                 });
 
             var result = new RedisSlidingWindowResponse();
@@ -99,21 +100,21 @@ namespace RedisRateLimiting.Concurrency
         internal RedisSlidingWindowResponse TryAcquireLease(string requestId, int permitCount)
         {
             var now = DateTimeOffset.UtcNow;
-            var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
+            double nowUnixTimeSeconds = now.ToUnixTimeMilliseconds() / 1000.0;
 
             var database = _connectionMultiplexer.GetDatabase();
 
             var response = (RedisValue[]?)database.ScriptEvaluate(
-               _redisScript,
+               Script,
                new
                {
                    rate_limit_key = RateLimitKey,
-                   permit_limit = _options.PermitLimit,
-                   window = _options.Window.TotalSeconds,
                    stats_key = StatsRateLimitKey,
-                   current_time = nowUnixTimeSeconds,
-                   unique_id = requestId,
-                   permit_count = permitCount
+                   permit_limit = (RedisValue)_options.PermitLimit,
+                   window = (RedisValue)_options.Window.TotalSeconds,
+                   permit_count = (RedisValue)permitCount,
+                   current_time = (RedisValue)nowUnixTimeSeconds,
+                   unique_id = (RedisValue)requestId,
                });
 
             var result = new RedisSlidingWindowResponse();

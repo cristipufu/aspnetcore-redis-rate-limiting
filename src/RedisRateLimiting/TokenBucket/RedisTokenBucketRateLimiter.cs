@@ -79,6 +79,7 @@ namespace RedisRateLimiting
 
             leaseContext.Allowed = response.Allowed;
             leaseContext.Count = response.Count;
+            leaseContext.RetryAfter = response.RetryAfter;
 
             if (leaseContext.Allowed)
             {
@@ -99,6 +100,7 @@ namespace RedisRateLimiting
 
             leaseContext.Allowed = response.Allowed;
             leaseContext.Count = response.Count;
+            leaseContext.RetryAfter = response.RetryAfter;
 
             if (leaseContext.Allowed)
             {
@@ -113,6 +115,8 @@ namespace RedisRateLimiting
             public long Count { get; set; }
 
             public long Limit { get; set; }
+
+            public int RetryAfter { get; set; }
 
             public bool Allowed { get; set; }
         }
@@ -144,6 +148,12 @@ namespace RedisRateLimiting
                 if (metadataName == RateLimitMetadataName.Remaining.Name && _context is not null)
                 {
                     metadata = _context.Count;
+                    return true;
+                }
+
+                if (metadataName == RateLimitMetadataName.RetryAfter.Name && _context is not null)
+                {
+                    metadata = _context.RetryAfter;
                     return true;
                 }
 

@@ -216,7 +216,6 @@ namespace RedisRateLimiting
             }
             catch
             {
-                // 
             }
         }
 

@@ -11,7 +11,7 @@ namespace RedisRateLimiting.Concurrency
         private readonly RedisKey RateLimitKey;
         private readonly RedisKey RateLimitExpireKey;
 
-        private static readonly LuaScript _redisScript = LuaScript.Prepare(
+        private static readonly LuaScript Script = LuaScript.Prepare(
           @"local expires_at = tonumber(redis.call(""get"", @expires_at_key))
             local current = tonumber(redis.call(""get"", @rate_limit_key))
             local requested = tonumber(@increment_amount)
@@ -63,15 +63,15 @@ namespace RedisRateLimiting.Concurrency
             var database = _connectionMultiplexer.GetDatabase();
 
             var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
-                _redisScript,
+                Script,
                 new
                 {
                     rate_limit_key = RateLimitKey,
                     expires_at_key = RateLimitExpireKey,
                     permit_limit = _options.PermitLimit,
-                    next_expires_at = now.Add(_options.Window).ToUnixTimeSeconds(),
-                    current_time = nowUnixTimeSeconds,
-                    increment_amount = permitCount,
+                    next_expires_at = (RedisValue)now.Add(_options.Window).ToUnixTimeSeconds(),
+                    current_time = (RedisValue)nowUnixTimeSeconds,
+                    increment_amount = (RedisValue)permitCount,
                 });
 
             var result = new RedisFixedWindowResponse();
@@ -95,15 +95,15 @@ namespace RedisRateLimiting.Concurrency
             var database = _connectionMultiplexer.GetDatabase();
 
             var response = (RedisValue[]?)database.ScriptEvaluate(
-                _redisScript,
+                Script,
                 new
                 {
                     rate_limit_key = RateLimitKey,
                     expires_at_key = RateLimitExpireKey,
                     permit_limit = _options.PermitLimit,
-                    next_expires_at = now.Add(_options.Window).ToUnixTimeSeconds(),
-                    current_time = nowUnixTimeSeconds,
-                    increment_amount = permitCount,
+                    next_expires_at = (RedisValue)now.Add(_options.Window).ToUnixTimeSeconds(),
+                    current_time = (RedisValue)nowUnixTimeSeconds,
+                    increment_amount = (RedisValue)permitCount,
                 });
 
             var result = new RedisFixedWindowResponse();

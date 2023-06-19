@@ -108,6 +108,33 @@ namespace RedisRateLimiting.Tests.UnitTests
         }
 
         [Fact]
+        public async Task CanAcquireAsyncResourceWithSmallWindow()
+        {
+            using var limiter = new RedisSlidingWindowRateLimiter<string>(
+                string.Empty,
+                new RedisSlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = 1,
+                    Window = TimeSpan.FromMilliseconds(100),
+                    ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
+                });
+
+            using var lease = await limiter.AcquireAsync();
+            Assert.True(lease.IsAcquired);
+
+            using var lease2 = await limiter.AcquireAsync();
+            Assert.False(lease2.IsAcquired);
+
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+
+            using var lease3 = await limiter.AcquireAsync();
+            Assert.True(lease3.IsAcquired);
+
+            using var lease4 = await limiter.AcquireAsync();
+            Assert.False(lease4.IsAcquired);
+        }
+        
+        [Fact]
         public async Task SupportsPermitCountFlag()
         {
             using var limiter = new RedisSlidingWindowRateLimiter<string>(
