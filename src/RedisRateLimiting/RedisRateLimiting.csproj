@@ -2,7 +2,7 @@
 
 	<PropertyGroup>
 		<OutputType>Library</OutputType>
-		<TargetFramework>net7.0</TargetFramework>
+		<TargetFramework>netstandard2.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<RootNamespace>RedisRateLimiting</RootNamespace>
 		<Description>Redis extensions for .NET 7.0 rate limiting</Description>

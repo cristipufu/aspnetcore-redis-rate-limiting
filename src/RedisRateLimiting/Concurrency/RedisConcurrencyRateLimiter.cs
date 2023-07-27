@@ -14,7 +14,7 @@ namespace RedisRateLimiting
         private readonly RedisConcurrencyRateLimiterOptions _options;
         private readonly ConcurrentQueue<Request> _queue = new();
 
-        private readonly PeriodicTimer? _periodicTimer;
+        private readonly System.Timers.Timer? _timer;
 
         private bool _disposed;
 
@@ -53,9 +53,12 @@ namespace RedisRateLimiting
 
             if (_options.QueueLimit > 0)
             {
-                _periodicTimer = new PeriodicTimer(_options.TryDequeuePeriod);
-
-                _ = StartDequeueTimerAsync(_periodicTimer);
+                _timer = new System.Timers.Timer(_options.TryDequeuePeriod.TotalMilliseconds);
+                _timer.Start();
+                _timer.Elapsed += async (s, e) =>
+                {
+                    await TryDequeueRequestsAsync();
+                };
             }
         }
 
@@ -151,14 +154,6 @@ namespace RedisRateLimiting
             _redisManager.ReleaseLease(leaseContext.RequestId);
         }
 
-        private async Task StartDequeueTimerAsync(PeriodicTimer periodicTimer)
-        {
-            while (await periodicTimer.WaitForNextTickAsync())
-            {
-                await TryDequeueRequestsAsync();
-            }
-        }
-
         private async Task TryDequeueRequestsAsync()
         {
             try
@@ -232,7 +227,7 @@ namespace RedisRateLimiting
 
             _disposed = true;
 
-            _periodicTimer?.Dispose();
+            _timer?.Dispose();
 
             while (_queue.TryDequeue(out var request))
             {
