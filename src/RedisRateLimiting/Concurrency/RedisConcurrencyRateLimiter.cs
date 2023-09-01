@@ -76,27 +76,7 @@ namespace RedisRateLimiting
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
         {
-            if (permitCount > _options.PermitLimit)
-            {
-                throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.PermitLimit));
-            }
-
-            var leaseContext = new ConcurencyLeaseContext
-            {
-                Limit = _options.PermitLimit,
-                RequestId = Guid.NewGuid().ToString(),
-            };
-
-            var response = _redisManager.TryAcquireLease(leaseContext.RequestId);
-
-            leaseContext.Count = response.Count;
-
-            if (response.Allowed)
-            {
-                return new ConcurrencyLease(isAcquired: true, this, leaseContext);
-            }
-
-            return new ConcurrencyLease(isAcquired: false, this, leaseContext);
+            return FailedLease;
         }
 
         private async ValueTask<RateLimitLease> AcquireAsyncCoreInternal(CancellationToken cancellationToken)
@@ -148,7 +128,7 @@ namespace RedisRateLimiting
         {
             if (leaseContext.RequestId is null) return;
 
-            _redisManager.ReleaseLease(leaseContext.RequestId);
+            _ = _redisManager.ReleaseLeaseAsync(leaseContext.RequestId);
         }
 
         private async Task StartDequeueTimerAsync(PeriodicTimer periodicTimer)

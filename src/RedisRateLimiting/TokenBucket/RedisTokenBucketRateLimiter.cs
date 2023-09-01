@@ -12,6 +12,8 @@ namespace RedisRateLimiting
         private readonly RedisTokenBucketManager _redisManager;
         private readonly RedisTokenBucketRateLimiterOptions _options;
 
+        private readonly TokenBucketLease FailedLease = new(isAcquired: false, null);
+
         public override TimeSpan? IdleDuration => TimeSpan.Zero;
 
         public RedisTokenBucketRateLimiter(TKey partitionKey, RedisTokenBucketRateLimiterOptions options)
@@ -65,28 +67,7 @@ namespace RedisRateLimiting
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
         {
-            if (permitCount > _options.TokenLimit)
-            {
-                throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.TokenLimit));
-            }
-
-            var leaseContext = new TokenBucketLeaseContext
-            {
-                Limit = _options.TokenLimit,
-            };
-
-            var response = _redisManager.TryAcquireLease();
-
-            leaseContext.Allowed = response.Allowed;
-            leaseContext.Count = response.Count;
-            leaseContext.RetryAfter = response.RetryAfter;
-
-            if (leaseContext.Allowed)
-            {
-                return new TokenBucketLease(isAcquired: true, leaseContext);
-            }
-
-            return new TokenBucketLease(isAcquired: false, leaseContext);
+            return FailedLease;
         }
 
         private async ValueTask<RateLimitLease> AcquireAsyncCoreInternal()
