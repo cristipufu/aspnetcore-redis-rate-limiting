@@ -16,16 +16,24 @@ namespace RedisRateLimiting.Concurrency
           @"local limit = tonumber(@permit_limit)
             local timestamp = tonumber(@current_time)
             local window = tonumber(@window)
+            local requested = tonumber(@permit_count)
+
+            local zaddparams = {}
+            for i=1,requested do
+                local index = i*2
+                zaddparams[index-1]=timestamp
+                zaddparams[index]=@unique_id..':'..tostring(i)
+            end
 
             -- remove all requests outside current window
             redis.call(""zremrangebyscore"", @rate_limit_key, '-inf', timestamp - window)
 
             local count = redis.call(""zcard"", @rate_limit_key)
-            local allowed = count < limit
+            local allowed = count + requested <= limit
 
             if allowed
             then
-                redis.call(""zadd"", @rate_limit_key, timestamp, @unique_id)
+                redis.call(""zadd"", @rate_limit_key, unpack(zaddparams))
             end
 
             local expireAtMilliseconds = math.floor((timestamp + window) * 1000 + 1);
@@ -58,7 +66,7 @@ namespace RedisRateLimiting.Concurrency
             StatsRateLimitKey = new RedisKey($"rl:{{{partitionKey}}}:stats");
         }
 
-        internal async Task<RedisSlidingWindowResponse> TryAcquireLeaseAsync(string requestId)
+        internal async Task<RedisSlidingWindowResponse> TryAcquireLeaseAsync(string requestId, int permitCount)
         {
             var now = DateTimeOffset.UtcNow;
             double nowUnixTimeSeconds = now.ToUnixTimeMilliseconds() / 1000.0;
@@ -73,6 +81,7 @@ namespace RedisRateLimiting.Concurrency
                     stats_key = StatsRateLimitKey,
                     permit_limit = (RedisValue)_options.PermitLimit,
                     window = (RedisValue)_options.Window.TotalSeconds,
+                    permit_count = (RedisValue)permitCount,
                     current_time = (RedisValue)nowUnixTimeSeconds,
                     unique_id = (RedisValue)requestId,
                 });
@@ -88,7 +97,7 @@ namespace RedisRateLimiting.Concurrency
             return result;
         }
 
-        internal RedisSlidingWindowResponse TryAcquireLease(string requestId)
+        internal RedisSlidingWindowResponse TryAcquireLease(string requestId, int permitCount)
         {
             var now = DateTimeOffset.UtcNow;
             double nowUnixTimeSeconds = now.ToUnixTimeMilliseconds() / 1000.0;
@@ -103,6 +112,7 @@ namespace RedisRateLimiting.Concurrency
                    stats_key = StatsRateLimitKey,
                    permit_limit = (RedisValue)_options.PermitLimit,
                    window = (RedisValue)_options.Window.TotalSeconds,
+                   permit_count = (RedisValue)permitCount,
                    current_time = (RedisValue)nowUnixTimeSeconds,
                    unique_id = (RedisValue)requestId,
                });

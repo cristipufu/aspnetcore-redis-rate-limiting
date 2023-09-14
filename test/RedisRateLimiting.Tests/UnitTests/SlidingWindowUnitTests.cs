@@ -133,5 +133,24 @@ namespace RedisRateLimiting.Tests.UnitTests
             using var lease4 = await limiter.AcquireAsync();
             Assert.False(lease4.IsAcquired);
         }
+        
+        [Fact]
+        public async Task SupportsPermitCountFlag()
+        {
+            using var limiter = new RedisSlidingWindowRateLimiter<string>(
+                "Test_SupportsPermitCountFlag_SW",
+                new RedisSlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = 3,
+                    Window = TimeSpan.FromMinutes(1),
+                    ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
+                });
+
+            using var lease = await limiter.AcquireAsync(permitCount: 3);
+            Assert.True(lease.IsAcquired);
+
+            using var lease2 = await limiter.AcquireAsync(permitCount: 1);
+            Assert.False(lease2.IsAcquired);
+        }
     }
 }

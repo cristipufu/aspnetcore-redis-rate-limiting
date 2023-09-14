@@ -107,5 +107,28 @@ namespace RedisRateLimiting.Tests.UnitTests
             using var lease2 = await limiter.AcquireAsync();
             Assert.False(lease2.IsAcquired);
         }
+
+        [Fact]
+        public async Task SupportsPermitCountFlag()
+        {
+            using var limiter = new RedisTokenBucketRateLimiter<string>(
+                "Test_SupportsPermitCountFlag_TB",
+                new RedisTokenBucketRateLimiterOptions
+                {
+                    TokenLimit = 5,
+                    TokensPerPeriod = 5,
+                    ReplenishmentPeriod = TimeSpan.FromMinutes(1),
+                    ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
+                });
+
+            using var lease = await limiter.AcquireAsync(4);
+            Assert.True(lease.IsAcquired);
+
+            using var lease2 = await limiter.AcquireAsync(3);
+            Assert.False(lease2.IsAcquired);
+
+            using var lease3 = await limiter.AcquireAsync(1);
+            Assert.True(lease3.IsAcquired);
+        }
     }
 }

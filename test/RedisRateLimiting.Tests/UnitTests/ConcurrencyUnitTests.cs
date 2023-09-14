@@ -121,6 +121,59 @@ namespace RedisRateLimiting.Tests.UnitTests
         }
 
         [Fact]
+        public async Task SupportsPermitCountFlag_NoQueue()
+        {
+            using var limiter = new RedisConcurrencyRateLimiter<string>(
+                "Test_SupportsPermitCountFlag_NoQueue_Concurrency",
+                new RedisConcurrencyRateLimiterOptions
+                {
+                    PermitLimit = 2,
+                    QueueLimit = 0,
+                    ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
+                });
+
+            var lease1 = await limiter.AcquireAsync(permitCount: 2);
+            var lease2 = await limiter.AcquireAsync(permitCount: 1);
+
+            Assert.True(lease1.IsAcquired);
+            Assert.False(lease2.IsAcquired);
+
+            lease1.Dispose();
+            lease2.Dispose();
+        }
+
+        [Fact]
+        public async Task SupportsPermitCountFlag_WithQueue()
+        {
+            using var limiter = new RedisConcurrencyRateLimiter<string>(
+                "Test_SupportsPermitCountFlag_WithQueue_Concurrency",
+                new RedisConcurrencyRateLimiterOptions
+                {
+                    PermitLimit = 2,
+                    QueueLimit = 2,
+                    ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
+                });
+
+            var lease1 = await limiter.AcquireAsync(permitCount: 2);
+            Assert.True(lease1.IsAcquired);
+
+            var wait2 = limiter.AcquireAsync(permitCount: 2);
+            var wait3 = limiter.AcquireAsync(permitCount: 1);
+
+            await Task.Delay(1000);
+            lease1.Dispose();
+
+            var lease2 = await wait2;
+            Assert.True(lease2.IsAcquired);
+
+            var lease3 = await wait3;
+            Assert.False(lease3.IsAcquired);
+
+            lease2.Dispose();
+            lease3.Dispose();
+        }
+
+        [Fact]
         public async Task CanAcquireResourceAsyncQueuesAndGrabsOldest()
         {
             using var limiter = new RedisConcurrencyRateLimiter<string>(
