@@ -12,6 +12,8 @@ namespace RedisRateLimiting
         private readonly RedisFixedWindowManager _redisManager;
         private readonly RedisFixedWindowRateLimiterOptions _options;
 
+        private readonly FixedWindowLease FailedLease = new(isAcquired: false, null);
+
         public override TimeSpan? IdleDuration => TimeSpan.Zero;
 
         public RedisFixedWindowRateLimiter(TKey partitionKey, RedisFixedWindowRateLimiterOptions options)
@@ -60,29 +62,7 @@ namespace RedisRateLimiting
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
         {
-            if (permitCount > _options.PermitLimit)
-            {
-                throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.PermitLimit));
-            }
-
-            var leaseContext = new FixedWindowLeaseContext
-            {
-                Limit = _options.PermitLimit,
-                Window = _options.Window,
-            };
-
-            var response = _redisManager.TryAcquireLease();
-
-            leaseContext.Count = response.Count;
-            leaseContext.RetryAfter = response.RetryAfter;
-            leaseContext.ExpiresAt = DateTimeOffset.FromUnixTimeSeconds(response.ExpiresAt);
-
-            if (leaseContext.Count > _options.PermitLimit)
-            {
-                return new FixedWindowLease(isAcquired: false, leaseContext);
-            }
-
-            return new FixedWindowLease(isAcquired: true, leaseContext);
+            return FailedLease;
         }
 
         private async ValueTask<RateLimitLease> AcquireAsyncCoreInternal()

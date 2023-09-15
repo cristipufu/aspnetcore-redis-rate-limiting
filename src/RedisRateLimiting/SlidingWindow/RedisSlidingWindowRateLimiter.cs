@@ -11,7 +11,9 @@ namespace RedisRateLimiting
     {
         private readonly RedisSlidingWindowManager _redisManager;
         private readonly RedisSlidingWindowRateLimiterOptions _options;
-        
+
+        private readonly SlidingWindowLease FailedLease = new(isAcquired: false, null);
+
         public override TimeSpan? IdleDuration => TimeSpan.Zero;
 
         public RedisSlidingWindowRateLimiter(TKey partitionKey, RedisSlidingWindowRateLimiterOptions options)
@@ -60,29 +62,7 @@ namespace RedisRateLimiting
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
         {
-            if (permitCount > _options.PermitLimit)
-            {
-                throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.PermitLimit));
-            }
-
-            var leaseContext = new SlidingWindowLeaseContext
-            {
-                Limit = _options.PermitLimit,
-                Window = _options.Window,
-                RequestId = Guid.NewGuid().ToString(),
-            };
-
-            var response = _redisManager.TryAcquireLease(leaseContext.RequestId);
-
-            leaseContext.Count = response.Count;
-            leaseContext.Allowed = response.Allowed;
-
-            if (leaseContext.Allowed)
-            {
-                return new SlidingWindowLease(isAcquired: true, leaseContext);
-            }
-
-            return new SlidingWindowLease(isAcquired: false, leaseContext);
+            return FailedLease;
         }
 
         private async ValueTask<RateLimitLease> AcquireAsyncCoreInternal()
