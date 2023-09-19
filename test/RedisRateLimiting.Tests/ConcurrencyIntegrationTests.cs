@@ -3,6 +3,7 @@ using RedisRateLimiting.AspNetCore;
 using System.Net;
 using Xunit;
 
+#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
 namespace RedisRateLimiting.Tests
 {
     [Collection("Seq")]
