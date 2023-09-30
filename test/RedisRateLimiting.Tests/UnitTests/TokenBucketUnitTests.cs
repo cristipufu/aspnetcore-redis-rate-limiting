@@ -2,14 +2,9 @@
 
 namespace RedisRateLimiting.Tests.UnitTests
 {
-    public class TokenBucketUnitTests : IClassFixture<TestFixture>
+    public class TokenBucketUnitTests(TestFixture fixture) : IClassFixture<TestFixture>
     {
-        private readonly TestFixture Fixture;
-
-        public TokenBucketUnitTests(TestFixture fixture)
-        {
-            Fixture = fixture;
-        }
+        private readonly TestFixture Fixture = fixture;
 
         [Fact]
         public void InvalidOptionsThrows()

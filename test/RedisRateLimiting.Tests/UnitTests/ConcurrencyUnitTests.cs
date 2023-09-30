@@ -2,14 +2,9 @@
 
 namespace RedisRateLimiting.Tests.UnitTests
 {
-    public class ConcurrencyUnitTests : IClassFixture<TestFixture>
+    public class ConcurrencyUnitTests(TestFixture fixture) : IClassFixture<TestFixture>
     {
-        private readonly TestFixture Fixture;
-
-        public ConcurrencyUnitTests(TestFixture fixture)
-        {
-            Fixture = fixture;
-        }
+        private readonly TestFixture Fixture = fixture;
 
         [Fact]
         public void InvalidOptionsThrows()
@@ -355,7 +350,7 @@ namespace RedisRateLimiting.Tests.UnitTests
         {
             var dequeueRequestsMethod = typeof(RedisConcurrencyRateLimiter<string>)
                 .GetMethod("TryDequeueRequestsAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-            dequeueRequestsMethod.Invoke(limiter, Array.Empty<object>());
+            dequeueRequestsMethod.Invoke(limiter, []);
         }
     }
 }

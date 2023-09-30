@@ -2,14 +2,9 @@
 
 namespace RedisRateLimiting.Tests.UnitTests
 {
-    public class FixedWindowUnitTests : IClassFixture<TestFixture>
+    public class FixedWindowUnitTests(TestFixture fixture) : IClassFixture<TestFixture>
     {
-        private readonly TestFixture Fixture;
-
-        public FixedWindowUnitTests(TestFixture fixture)
-        {
-            Fixture = fixture;
-        }
+        private readonly TestFixture Fixture = fixture;
 
         [Fact]
         public void InvalidOptionsThrows()

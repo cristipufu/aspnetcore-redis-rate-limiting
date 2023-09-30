@@ -37,10 +37,11 @@ jobs:
         run: |
           New-Item -Path .\.sonar\scanner -ItemType Directory
           dotnet tool update dotnet-sonarscanner --tool-path .\.sonar\scanner
-      - name: Setup .NET Core @ Latest
+      - name: Setup .NET 8
         uses: actions/setup-dotnet@v3     
         with:
-            dotnet-version: '7.0.x'  
+          dotnet-version: '8.0.100-rc.2.23502.2'
+          include-prerelease: true
       - name: Build and analyze
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
