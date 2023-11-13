@@ -78,7 +78,7 @@ namespace RedisRateLimiting
 
             leaseContext.Count = response.Count;
             leaseContext.RetryAfter = response.RetryAfter;
-            leaseContext.ExpiresAt = DateTimeOffset.FromUnixTimeSeconds(response.ExpiresAt);
+            leaseContext.ExpiresAt = response.ExpiresAt;
 
             if (leaseContext.Count > _options.PermitLimit)
             {
@@ -98,7 +98,7 @@ namespace RedisRateLimiting
 
             public TimeSpan? RetryAfter { get; set; }
 
-            public DateTimeOffset? ExpiresAt { get; set; }
+            public long? ExpiresAt { get; set; }
         }
 
         private sealed class FixedWindowLease : RateLimitLease
