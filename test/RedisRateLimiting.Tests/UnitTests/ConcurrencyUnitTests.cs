@@ -48,9 +48,7 @@ namespace RedisRateLimiting.Tests.UnitTests
                     QueueLimit = 1,
                     ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
                 });
-            var ex = Assert.Throws<ArgumentOutOfRangeException>(() => limiter.AttemptAcquire(2));
-            Assert.Equal("permitCount", ex.ParamName);
-            ex = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await limiter.AcquireAsync(2));
+            var ex = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await limiter.AcquireAsync(2));
             Assert.Equal("permitCount", ex.ParamName);
         }
 
@@ -89,7 +87,7 @@ namespace RedisRateLimiting.Tests.UnitTests
             Assert.Equal(1, stats.CurrentAvailablePermits);
         }
 
-        [Fact]
+        [Fact(Skip = "Sync always returns failed lease")]
         public void CanAcquireResource()
         {
             using var limiter = new RedisConcurrencyRateLimiter<string>(
@@ -161,7 +159,7 @@ namespace RedisRateLimiting.Tests.UnitTests
                     ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
                 });
 
-            using var lease = limiter.AttemptAcquire();
+            using var lease = await limiter.AcquireAsync();
             var wait = limiter.AcquireAsync();
 
             var failedLease = await limiter.AcquireAsync();
@@ -182,7 +180,7 @@ namespace RedisRateLimiting.Tests.UnitTests
                     ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
                 });
 
-            var lease = limiter.AttemptAcquire();
+            var lease = await limiter.AcquireAsync();
             var wait = limiter.AcquireAsync();
 
             await Task.Delay(1000);

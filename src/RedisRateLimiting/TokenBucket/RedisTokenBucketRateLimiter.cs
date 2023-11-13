@@ -67,6 +67,7 @@ namespace RedisRateLimiting
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
         {
+            // https://github.com/cristipufu/aspnetcore-redis-rate-limiting/issues/66
             return FailedLease;
         }
 
