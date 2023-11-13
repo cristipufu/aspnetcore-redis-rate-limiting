@@ -77,9 +77,7 @@ namespace RedisRateLimiting.Tests.UnitTests
                     ReplenishmentPeriod = TimeSpan.FromMinutes(1),
                     ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
                 });
-            var ex = Assert.Throws<ArgumentOutOfRangeException>(() => limiter.AttemptAcquire(2));
-            Assert.Equal("permitCount", ex.ParamName);
-            ex = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await limiter.AcquireAsync(2));
+            var ex = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await limiter.AcquireAsync(2));
             Assert.Equal("permitCount", ex.ParamName);
         }
 

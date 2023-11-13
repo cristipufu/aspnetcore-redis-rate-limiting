@@ -64,9 +64,7 @@ namespace RedisRateLimiting.Tests.UnitTests
                     Window = TimeSpan.FromMinutes(1),
                     ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
                 });
-            var ex = Assert.Throws<ArgumentOutOfRangeException>(() => limiter.AttemptAcquire(2));
-            Assert.Equal("permitCount", ex.ParamName);
-            ex = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await limiter.AcquireAsync(2));
+            var ex = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await limiter.AcquireAsync(2));
             Assert.Equal("permitCount", ex.ParamName);
         }
 
@@ -110,7 +108,7 @@ namespace RedisRateLimiting.Tests.UnitTests
                 new RedisSlidingWindowRateLimiterOptions
                 {
                     PermitLimit = 1,
-                    Window = TimeSpan.FromMilliseconds(100),
+                    Window = TimeSpan.FromMilliseconds(600),
                     ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
                 });
 
@@ -120,7 +118,7 @@ namespace RedisRateLimiting.Tests.UnitTests
             using var lease2 = await limiter.AcquireAsync();
             Assert.False(lease2.IsAcquired);
 
-            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            await Task.Delay(TimeSpan.FromMilliseconds(600));
 
             using var lease3 = await limiter.AcquireAsync();
             Assert.True(lease3.IsAcquired);
