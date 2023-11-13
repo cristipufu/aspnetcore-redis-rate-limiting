@@ -78,6 +78,7 @@ namespace RedisRateLimiting
 
             leaseContext.Count = response.Count;
             leaseContext.RetryAfter = response.RetryAfter;
+            leaseContext.ExpiresAt = DateTimeOffset.FromUnixTimeSeconds(response.ExpiresAt);
 
             if (leaseContext.Count > _options.PermitLimit)
             {
