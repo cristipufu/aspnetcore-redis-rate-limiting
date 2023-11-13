@@ -109,9 +109,9 @@ namespace RedisRateLimiting.Concurrency
             _options = options;
             _connectionMultiplexer = options.ConnectionMultiplexerFactory!.Invoke();
 
-            RateLimitKey = new RedisKey($"rl:{{{partitionKey}}}");
-            QueueRateLimitKey = new RedisKey($"rl:{{{partitionKey}}}:q");
-            StatsRateLimitKey = new RedisKey($"rl:{{{partitionKey}}}:stats");
+            RateLimitKey = new RedisKey($"rl:cc:{{{partitionKey}}}");
+            QueueRateLimitKey = new RedisKey($"rl:cc:{{{partitionKey}}}:q");
+            StatsRateLimitKey = new RedisKey($"rl:cc:{{{partitionKey}}}:stats");
         }
 
         internal async Task<RedisConcurrencyResponse> TryAcquireLeaseAsync(string requestId, bool tryEnqueue = false)

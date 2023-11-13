@@ -79,8 +79,8 @@ namespace RedisRateLimiting.Concurrency
             _options = options;
             _connectionMultiplexer = options.ConnectionMultiplexerFactory!.Invoke();
 
-            RateLimitKey = new RedisKey($"rl:{{{partitionKey}}}");
-            RateLimitTimestampKey = new RedisKey($"rl:{{{partitionKey}}}:ts");
+            RateLimitKey = new RedisKey($"rl:tb:{{{partitionKey}}}");
+            RateLimitTimestampKey = new RedisKey($"rl:tb:{{{partitionKey}}}:ts");
         }
 
         internal async Task<RedisTokenBucketResponse> TryAcquireLeaseAsync()
