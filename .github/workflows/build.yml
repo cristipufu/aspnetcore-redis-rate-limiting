@@ -41,7 +41,6 @@ jobs:
         uses: actions/setup-dotnet@v3     
         with:
           dotnet-version: '8.0.100-rc.2.23502.2'
-          include-prerelease: true
       - name: Build and analyze
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
@@ -53,4 +52,6 @@ jobs:
           dotnet tool install --global dotnet-coverage
           dotnet build --no-incremental
           dotnet-coverage collect 'dotnet test' -f xml -o 'coverage.xml'
+          $testExitCode = $LASTEXITCODE
           .\.sonar\scanner\dotnet-sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+          if ($testExitCode -ne 0) { exit $testExitCode }
