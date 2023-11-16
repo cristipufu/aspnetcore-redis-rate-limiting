@@ -23,9 +23,9 @@ namespace RedisRateLimiting.Tests.UnitTests
             ConnectionMultiplexerFactory = () => ConnectionMultiplexer;
         }
 
-        public async Task ClearStatisticsAsync(string partitionKey)
+        public async Task ClearStatisticsAsync(string rl, string partitionKey)
         {
-            var key = $"rl:{{{partitionKey}}}:stats";
+            var key = $"rl:{rl}:{{{partitionKey}}}:stats";
             var database = ConnectionMultiplexer.GetDatabase();
             await database.KeyDeleteAsync(key);
         }

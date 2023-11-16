@@ -71,7 +71,7 @@ namespace RedisRateLimiting.Tests.UnitTests
         [Fact]
         public async Task CanAcquireAsyncResource()
         {
-            await Fixture.ClearStatisticsAsync("Test_CanAcquireAsyncResource_SW");
+            await Fixture.ClearStatisticsAsync("sw", "Test_CanAcquireAsyncResource_SW");
 
             using var limiter = new RedisSlidingWindowRateLimiter<string>(
                 "Test_CanAcquireAsyncResource_SW",

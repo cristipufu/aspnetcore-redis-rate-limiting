@@ -55,7 +55,7 @@ namespace RedisRateLimiting.Tests.UnitTests
         [Fact]
         public async Task CanAcquireAsyncResource()
         {
-            await Fixture.ClearStatisticsAsync("Test_CanAcquireAsyncResource");
+            await Fixture.ClearStatisticsAsync("cc", "Test_CanAcquireAsyncResource");
 
             using var limiter = new RedisConcurrencyRateLimiter<string>(
                 "Test_CanAcquireAsyncResource",
@@ -169,7 +169,7 @@ namespace RedisRateLimiting.Tests.UnitTests
         [Fact]
         public async Task QueueAvailableAfterQueueLimitHitAndResourcesBecomeAvailable()
         {
-            await Fixture.ClearStatisticsAsync("Test_QueueAvailableAfterQueueLimitHitAndResourcesBecomeAvailable");
+            await Fixture.ClearStatisticsAsync("cc", "Test_QueueAvailableAfterQueueLimitHitAndResourcesBecomeAvailable");
 
             using var limiter = new RedisConcurrencyRateLimiter<string>(
                 "Test_QueueAvailableAfterQueueLimitHitAndResourcesBecomeAvailable",
