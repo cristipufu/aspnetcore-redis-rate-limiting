@@ -41,7 +41,7 @@ namespace RedisRateLimiting.Tests.UnitTests
         public async Task ThrowsWhenAcquiringMoreThanLimit()
         {
             var limiter = new RedisConcurrencyRateLimiter<string>(
-                string.Empty,
+                partitionKey: Guid.NewGuid().ToString(),
                 new RedisConcurrencyRateLimiterOptions
                 {
                     PermitLimit = 1,
@@ -55,10 +55,8 @@ namespace RedisRateLimiting.Tests.UnitTests
         [Fact]
         public async Task CanAcquireAsyncResource()
         {
-            await Fixture.ClearStatisticsAsync("cc", "Test_CanAcquireAsyncResource");
-
             using var limiter = new RedisConcurrencyRateLimiter<string>(
-                "Test_CanAcquireAsyncResource",
+                partitionKey: Guid.NewGuid().ToString(),
                 new RedisConcurrencyRateLimiterOptions
                 {
                     PermitLimit = 1,
@@ -91,7 +89,7 @@ namespace RedisRateLimiting.Tests.UnitTests
         public void CanAcquireResource()
         {
             using var limiter = new RedisConcurrencyRateLimiter<string>(
-                "Test_CanAcquireResource",
+                partitionKey: Guid.NewGuid().ToString(),
                 new RedisConcurrencyRateLimiterOptions
                 {
                     PermitLimit = 1,
@@ -117,7 +115,7 @@ namespace RedisRateLimiting.Tests.UnitTests
         public async Task CanAcquireResourceAsyncQueuesAndGrabsOldest()
         {
             using var limiter = new RedisConcurrencyRateLimiter<string>(
-                "Test_CanAcquireResourceAsyncQueuesAndGrabsOldest",
+                partitionKey: Guid.NewGuid().ToString(),
                 new RedisConcurrencyRateLimiterOptions
                 {
                     PermitLimit = 1,
@@ -151,7 +149,7 @@ namespace RedisRateLimiting.Tests.UnitTests
         public async Task FailsWhenQueuingMoreThanLimit()
         {
             using var limiter = new RedisConcurrencyRateLimiter<string>(
-                "Test_FailsWhenQueuingMoreThanLimit",
+                partitionKey: Guid.NewGuid().ToString(),
                 new RedisConcurrencyRateLimiterOptions
                 {
                     PermitLimit = 1,
@@ -169,10 +167,8 @@ namespace RedisRateLimiting.Tests.UnitTests
         [Fact]
         public async Task QueueAvailableAfterQueueLimitHitAndResourcesBecomeAvailable()
         {
-            await Fixture.ClearStatisticsAsync("cc", "Test_QueueAvailableAfterQueueLimitHitAndResourcesBecomeAvailable");
-
             using var limiter = new RedisConcurrencyRateLimiter<string>(
-                "Test_QueueAvailableAfterQueueLimitHitAndResourcesBecomeAvailable",
+                partitionKey: Guid.NewGuid().ToString(),
                 new RedisConcurrencyRateLimiterOptions
                 {
                     PermitLimit = 1,
@@ -217,7 +213,7 @@ namespace RedisRateLimiting.Tests.UnitTests
         public async Task CanDequeueMultipleResourcesAtOnce()
         {
             using var limiter = new RedisConcurrencyRateLimiter<string>(
-                "Test_CanDequeueMultipleResourcesAtOnce",
+                partitionKey: Guid.NewGuid().ToString(),
                 new RedisConcurrencyRateLimiterOptions
                 {
                     PermitLimit = 2,
@@ -249,7 +245,7 @@ namespace RedisRateLimiting.Tests.UnitTests
         public async Task CanCancelAcquireAsyncAfterQueuing()
         {
             var limiter = new RedisConcurrencyRateLimiter<string>(
-                "CanCancelAcquireAsyncAfterQueuing",
+                partitionKey: Guid.NewGuid().ToString(),
                 new RedisConcurrencyRateLimiterOptions
                 {
                     PermitLimit = 1,
@@ -299,7 +295,7 @@ namespace RedisRateLimiting.Tests.UnitTests
         public async Task GetPermitWhilePermitEmptyQueueNotEmptyGetsQueued()
         {
             using var limiter = new RedisConcurrencyRateLimiter<string>(
-                "GetPermitWhilePermitEmptyQueueNotEmptyGetsQueued",
+                partitionKey: Guid.NewGuid().ToString(),
                 new RedisConcurrencyRateLimiterOptions
                 {
                     PermitLimit = 1,

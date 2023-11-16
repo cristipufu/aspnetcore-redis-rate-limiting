@@ -69,7 +69,7 @@ namespace RedisRateLimiting.Tests.UnitTests
         public async Task ThrowsWhenAcquiringMoreThanLimit()
         {
             var limiter = new RedisTokenBucketRateLimiter<string>(
-                string.Empty,
+                partitionKey: Guid.NewGuid().ToString(),
                 new RedisTokenBucketRateLimiterOptions
                 {
                     TokenLimit = 1,
@@ -85,7 +85,7 @@ namespace RedisRateLimiting.Tests.UnitTests
         public async Task CanAcquireAsyncResource()
         {
             using var limiter = new RedisTokenBucketRateLimiter<string>(
-                "Test_CanAcquireAsyncResource_TB",
+                partitionKey: Guid.NewGuid().ToString(),
                 new RedisTokenBucketRateLimiterOptions
                 {
                     TokenLimit = 1,

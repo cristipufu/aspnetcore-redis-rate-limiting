@@ -50,7 +50,7 @@ namespace RedisRateLimiting.Tests.UnitTests
         public async Task ThrowsWhenAcquiringMoreThanLimit()
         {
             var limiter = new RedisFixedWindowRateLimiter<string>(
-                string.Empty,
+                partitionKey: Guid.NewGuid().ToString(),
                 new RedisFixedWindowRateLimiterOptions
                 {
                     PermitLimit = 1,
@@ -65,7 +65,7 @@ namespace RedisRateLimiting.Tests.UnitTests
         public async Task CanAcquireAsyncResource()
         {
             using var limiter = new RedisFixedWindowRateLimiter<string>(
-                "Test_CanAcquireAsyncResource_FW",
+                partitionKey: Guid.NewGuid().ToString(),
                 new RedisFixedWindowRateLimiterOptions
                 {
                     PermitLimit = 1,
