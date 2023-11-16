@@ -7,7 +7,7 @@
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=cristipufu_aspnetcore-redis-rate-limiting&metric=vulnerabilities&token=5fea970e583d49909265cbcc99a54f2b5a9d3c19)](https://sonarcloud.io/summary/new_code?id=cristipufu_aspnetcore-redis-rate-limiting)
 [![GitHub](https://img.shields.io/github/license/cristipufu/aspnetcore-redis-rate-limiting)](https://github.com/cristipufu/aspnetcore-redis-rate-limiting/blob/master/LICENSE)
 
-Set up a Redis backplane for Rate Limiting ASP.NET Core multi-node deployments. The library is build on top of the [built-in Rate Limiting support that's part of .NET 7](https://devblogs.microsoft.com/dotnet/announcing-rate-limiting-for-dotnet/).
+Set up a Redis backplane for Rate Limiting ASP.NET Core multi-node deployments. The library is build on top of the [built-in Rate Limiting support that's part of .NET 7 and .NET 8](https://devblogs.microsoft.com/dotnet/announcing-rate-limiting-for-dotnet/).
 
 For more advanced use cases you can check out the [official documentation here](https://learn.microsoft.com/en-us/aspnet/core/performance/rate-limit?view=aspnetcore-7.0).
 
@@ -19,21 +19,21 @@ For more advanced use cases you can check out the [official documentation here](
 PM> Install-Package RedisRateLimiting
 ```
 ```
-TargetFramework: net7.0
+TargetFramework: net7.0; net8.0
 
 Dependencies:
-StackExchange.Redis (>= 2.6.86)
-System.Threading.RateLimiting (>= 7.0.0)
+StackExchange.Redis
+System.Threading.RateLimiting
 ```
 
 ```xml
 PM> Install-Package RedisRateLimiting.AspNetCore
 ```
 ```
-TargetFramework: net7.0
+TargetFramework: net7.0; net8.0
 
 Dependencies:
-RedisRateLimiting (>= 1.0.7)
+RedisRateLimiting
 ```
 
 # strategies
