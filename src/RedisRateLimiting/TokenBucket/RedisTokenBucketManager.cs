@@ -17,14 +17,7 @@ namespace RedisRateLimiting.Concurrency
             local rate = tonumber(@tokens_per_period)
             local period = tonumber(@replenish_period)
             local requested = tonumber(@permit_count)
-
-            -- Even though it is the default since Redis 5, we explicitly enable command replication.
-            -- This ensures that non-deterministic commands like 'TIME' are replicated by effect.
-            redis.replicate_commands()
-
-            -- Retrieve the current time as unix timestamp with millisecond accuracy.
-            local time = redis.call('TIME')
-            local now = math.floor((time[1] * 1000) + (time[2] / 1000))
+            local now = tonumber(@current_time)
 
             -- Load the current state from Redis. We use MGET to save a round-trip.
             local state = redis.call('MGET', @rate_limit_key, @timestamp_key)
@@ -97,6 +90,7 @@ namespace RedisRateLimiting.Concurrency
                     token_limit = (RedisValue)_options.TokenLimit,
                     replenish_period = (RedisValue)_options.ReplenishmentPeriod.TotalMilliseconds,
                     permit_count = (RedisValue)1D,
+                    current_time = (RedisValue)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 });
 
             var result = new RedisTokenBucketResponse();
@@ -125,6 +119,7 @@ namespace RedisRateLimiting.Concurrency
                     token_limit = (RedisValue)_options.TokenLimit,
                     replenish_period = (RedisValue)_options.ReplenishmentPeriod.TotalMilliseconds,
                     permit_count = (RedisValue)1D,
+                    current_time = (RedisValue)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 });
 
             var result = new RedisTokenBucketResponse();
