@@ -79,5 +79,27 @@ namespace RedisRateLimiting.Tests.UnitTests
             using var lease2 = await limiter.AcquireAsync();
             Assert.False(lease2.IsAcquired);
         }
+
+        [Fact]
+        public async Task CanAcquireMultiplePermits()
+        {
+            using var limiter = new RedisFixedWindowRateLimiter<string>(
+                partitionKey: Guid.NewGuid().ToString(),
+                new RedisFixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 5,
+                    Window = TimeSpan.FromMinutes(1),
+                    ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
+                });
+
+            using var lease = await limiter.AcquireAsync(permitCount: 3);
+            Assert.True(lease.IsAcquired);
+
+            using var lease2 = await limiter.AcquireAsync(permitCount: 3);
+            Assert.False(lease2.IsAcquired);
+
+            using var lease3 = await limiter.AcquireAsync(permitCount: 2);
+            Assert.True(lease3.IsAcquired);
+        }
     }
 }
