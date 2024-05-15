@@ -76,7 +76,7 @@ namespace RedisRateLimiting.Concurrency
             RateLimitTimestampKey = new RedisKey($"rl:tb:{{{partitionKey}}}:ts");
         }
 
-        internal async Task<RedisTokenBucketResponse> TryAcquireLeaseAsync()
+        internal async Task<RedisTokenBucketResponse> TryAcquireLeaseAsync(int permitCount)
         {
             var database = _connectionMultiplexer.GetDatabase();
 
@@ -89,7 +89,7 @@ namespace RedisRateLimiting.Concurrency
                     tokens_per_period = (RedisValue)_options.TokensPerPeriod,
                     token_limit = (RedisValue)_options.TokenLimit,
                     replenish_period = (RedisValue)_options.ReplenishmentPeriod.TotalMilliseconds,
-                    permit_count = (RedisValue)1D,
+                    permit_count = (RedisValue)permitCount,
                     current_time = (RedisValue)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 });
 
