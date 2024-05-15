@@ -62,7 +62,7 @@ namespace RedisRateLimiting
                 throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.TokenLimit));
             }
 
-            return AcquireAsyncCoreInternal();
+            return AcquireAsyncCoreInternal(permitCount);
         }
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
@@ -71,14 +71,14 @@ namespace RedisRateLimiting
             return FailedLease;
         }
 
-        private async ValueTask<RateLimitLease> AcquireAsyncCoreInternal()
+        private async ValueTask<RateLimitLease> AcquireAsyncCoreInternal(int permitCount)
         {
             var leaseContext = new TokenBucketLeaseContext
             {
                 Limit = _options.TokenLimit,
             };
 
-            var response = await _redisManager.TryAcquireLeaseAsync();
+            var response = await _redisManager.TryAcquireLeaseAsync(permitCount);
 
             leaseContext.Allowed = response.Allowed;
             leaseContext.Count = response.Count;
