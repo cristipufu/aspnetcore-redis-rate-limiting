@@ -57,7 +57,7 @@ namespace RedisRateLimiting
                 throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.PermitLimit));
             }
 
-            return AcquireAsyncCoreInternal();
+            return AcquireAsyncCoreInternal(permitCount);
         }
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)
@@ -66,7 +66,7 @@ namespace RedisRateLimiting
             return FailedLease;
         }
 
-        private async ValueTask<RateLimitLease> AcquireAsyncCoreInternal()
+        private async ValueTask<RateLimitLease> AcquireAsyncCoreInternal(int permitCount)
         {
             var leaseContext = new FixedWindowLeaseContext
             {
@@ -74,18 +74,13 @@ namespace RedisRateLimiting
                 Window = _options.Window,
             };
 
-            var response = await _redisManager.TryAcquireLeaseAsync();
+            var response = await _redisManager.TryAcquireLeaseAsync(permitCount);
 
             leaseContext.Count = response.Count;
             leaseContext.RetryAfter = response.RetryAfter;
             leaseContext.ExpiresAt = response.ExpiresAt;
 
-            if (leaseContext.Count > _options.PermitLimit)
-            {
-                return new FixedWindowLease(isAcquired: false, leaseContext);
-            }
-
-            return new FixedWindowLease(isAcquired: true, leaseContext);
+            return new FixedWindowLease(isAcquired: response.Allowed, leaseContext);
         }
 
         private sealed class FixedWindowLeaseContext
