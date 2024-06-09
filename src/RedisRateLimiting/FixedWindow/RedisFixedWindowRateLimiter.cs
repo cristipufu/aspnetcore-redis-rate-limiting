@@ -1,6 +1,7 @@
 ﻿using RedisRateLimiting.Concurrency;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.RateLimiting;
 using System.Threading.Tasks;
@@ -9,12 +10,19 @@ namespace RedisRateLimiting
 {
     public class RedisFixedWindowRateLimiter<TKey> : RateLimiter
     {
+        private static readonly double TickFrequency = (double)TimeSpan.TicksPerSecond / Stopwatch.Frequency;
+
         private readonly RedisFixedWindowManager _redisManager;
         private readonly RedisFixedWindowRateLimiterOptions _options;
 
         private readonly FixedWindowLease FailedLease = new(isAcquired: false, null);
 
-        public override TimeSpan? IdleDuration => TimeSpan.Zero;
+        private int _activeRequestsCount;
+        private long _idleSince = Stopwatch.GetTimestamp();
+
+        public override TimeSpan? IdleDuration => Interlocked.CompareExchange(ref _activeRequestsCount, 0, 0) > 0
+            ? null
+            : new TimeSpan((long)((Stopwatch.GetTimestamp() - _idleSince) * TickFrequency));
 
         public RedisFixedWindowRateLimiter(TKey partitionKey, RedisFixedWindowRateLimiterOptions options)
         {
@@ -74,7 +82,17 @@ namespace RedisRateLimiting
                 Window = _options.Window,
             };
 
-            var response = await _redisManager.TryAcquireLeaseAsync(permitCount);
+            RedisFixedWindowResponse response;
+            Interlocked.Increment(ref _activeRequestsCount);
+            try
+            {
+                response = await _redisManager.TryAcquireLeaseAsync(permitCount);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _activeRequestsCount);
+                _idleSince = Stopwatch.GetTimestamp();
+            }
 
             leaseContext.Count = response.Count;
             leaseContext.RetryAfter = response.RetryAfter;
