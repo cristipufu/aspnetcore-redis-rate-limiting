@@ -1,6 +1,7 @@
 ﻿using RedisRateLimiting.Concurrency;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.RateLimiting;
 using System.Threading.Tasks;
@@ -9,12 +10,19 @@ namespace RedisRateLimiting
 {
     public class RedisTokenBucketRateLimiter<TKey> : RateLimiter
     {
+        private static readonly double TickFrequency = (double)TimeSpan.TicksPerSecond / Stopwatch.Frequency;
+
         private readonly RedisTokenBucketManager _redisManager;
         private readonly RedisTokenBucketRateLimiterOptions _options;
 
         private readonly TokenBucketLease FailedLease = new(isAcquired: false, null);
 
-        public override TimeSpan? IdleDuration => TimeSpan.Zero;
+        private int _activeRequestsCount;
+        private long _idleSince = Stopwatch.GetTimestamp();
+
+        public override TimeSpan? IdleDuration => Interlocked.CompareExchange(ref _activeRequestsCount, 0, 0) > 0
+            ? null
+            : new TimeSpan((long)((Stopwatch.GetTimestamp() - _idleSince) * TickFrequency));
 
         public RedisTokenBucketRateLimiter(TKey partitionKey, RedisTokenBucketRateLimiterOptions options)
         {
@@ -55,14 +63,24 @@ namespace RedisRateLimiting
             throw new NotImplementedException();
         }
 
-        protected override ValueTask<RateLimitLease> AcquireAsyncCore(int permitCount, CancellationToken cancellationToken)
+        protected override async ValueTask<RateLimitLease> AcquireAsyncCore(int permitCount, CancellationToken cancellationToken)
         {
+            _idleSince = Stopwatch.GetTimestamp();
             if (permitCount > _options.TokenLimit)
             {
                 throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.TokenLimit));
             }
 
-            return AcquireAsyncCoreInternal(permitCount);
+            Interlocked.Increment(ref _activeRequestsCount);
+            try
+            {
+                return await AcquireAsyncCoreInternal(permitCount);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _activeRequestsCount);
+                _idleSince = Stopwatch.GetTimestamp();
+            }
         }
 
         protected override RateLimitLease AttemptAcquireCore(int permitCount)

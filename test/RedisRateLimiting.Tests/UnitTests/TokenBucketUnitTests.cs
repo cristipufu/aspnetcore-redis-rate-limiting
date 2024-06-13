@@ -123,5 +123,25 @@ namespace RedisRateLimiting.Tests.UnitTests
             using var lease3 = await limiter.AcquireAsync(1);
             Assert.True(lease3.IsAcquired);
         }
+
+        [Fact]
+        public async Task IdleDurationIsUpdated()
+        {
+            await using var limiter = new RedisTokenBucketRateLimiter<string>(
+                partitionKey: Guid.NewGuid().ToString(),
+                new RedisTokenBucketRateLimiterOptions
+                {
+                    TokenLimit = 1,
+                    TokensPerPeriod = 1,
+                    ReplenishmentPeriod = TimeSpan.FromMinutes(1),
+                    ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
+                });
+            await Task.Delay(TimeSpan.FromMilliseconds(5));
+            Assert.NotEqual(TimeSpan.Zero, limiter.IdleDuration);
+
+            var previousIdleDuration = limiter.IdleDuration;
+            using var lease = await limiter.AcquireAsync();
+            Assert.True(limiter.IdleDuration < previousIdleDuration);
+        }
     }
 }

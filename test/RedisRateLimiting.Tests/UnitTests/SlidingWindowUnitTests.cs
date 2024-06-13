@@ -124,5 +124,24 @@ namespace RedisRateLimiting.Tests.UnitTests
             using var lease4 = await limiter.AcquireAsync();
             Assert.False(lease4.IsAcquired);
         }
+        
+        [Fact]
+        public async Task IdleDurationIsUpdated()
+        {
+            await using var limiter = new RedisSlidingWindowRateLimiter<string>(
+                partitionKey: Guid.NewGuid().ToString(),
+                new RedisSlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = 1,
+                    Window = TimeSpan.FromMilliseconds(600),
+                    ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
+                });
+            await Task.Delay(TimeSpan.FromMilliseconds(5));
+            Assert.NotEqual(TimeSpan.Zero, limiter.IdleDuration);
+
+            var previousIdleDuration = limiter.IdleDuration;
+            using var lease = await limiter.AcquireAsync();
+            Assert.True(limiter.IdleDuration < previousIdleDuration);
+        }
     }
 }

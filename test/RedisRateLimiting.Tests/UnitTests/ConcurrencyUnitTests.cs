@@ -339,6 +339,26 @@ namespace RedisRateLimiting.Tests.UnitTests
             using var lease3 = await wait3;
             Assert.True(lease3.IsAcquired);
         }
+        
+        [Fact]
+        public async Task IdleDurationIsUpdated()
+        {
+            await using var limiter = new RedisConcurrencyRateLimiter<string>(
+                partitionKey: Guid.NewGuid().ToString(),
+                new RedisConcurrencyRateLimiterOptions
+                {
+                    PermitLimit = 1,
+                    QueueLimit = 1,
+                    TryDequeuePeriod = TimeSpan.FromHours(1),
+                    ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
+                });
+            await Task.Delay(TimeSpan.FromMilliseconds(5));
+            Assert.NotEqual(TimeSpan.Zero, limiter.IdleDuration);
+
+            var previousIdleDuration = limiter.IdleDuration;
+            using var lease = await limiter.AcquireAsync();
+            Assert.True(limiter.IdleDuration < previousIdleDuration);
+        }
 
         static internal void ForceDequeue(RedisConcurrencyRateLimiter<string> limiter)
         {
