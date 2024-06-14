@@ -20,7 +20,7 @@ jobs:
       - name: Build and Publish
         run: |  
           cd ./src/RedisRateLimiting/
-          dotnet pack -c Release -o artifacts -p:PackageVersion=1.1.0
+          dotnet pack -c Release -o artifacts -p:PackageVersion=1.2.0
 
       - name: Push
-        run: dotnet nuget push ./src/RedisRateLimiting/artifacts/RedisRateLimiting.1.1.0.nupkg -k ${{ secrets.NUGET_APIKEY }} -s https://api.nuget.org/v3/index.json
+        run: dotnet nuget push ./src/RedisRateLimiting/artifacts/RedisRateLimiting.1.2.0.nupkg -k ${{ secrets.NUGET_APIKEY }} -s https://api.nuget.org/v3/index.json
