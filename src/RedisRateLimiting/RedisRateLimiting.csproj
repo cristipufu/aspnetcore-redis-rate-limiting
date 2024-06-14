@@ -14,7 +14,7 @@
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<RepositoryType>git</RepositoryType>
 		<RepositoryUrl>https://github.com/cristipufu/aspnetcore-redis-rate-limiting</RepositoryUrl>
-		<Version>1.1.0</Version>
+		<Version>1.2.0</Version>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
 
