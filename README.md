@@ -2,6 +2,7 @@
 
 [![NuGet](https://img.shields.io/nuget/v/RedisRateLimiting)](https://www.nuget.org/packages/RedisRateLimiting)
 [![NuGet](https://img.shields.io/nuget/v/RedisRateLimiting.AspNetCore)](https://www.nuget.org/packages/RedisRateLimiting.AspNetCore) 
+[![Nuget](https://img.shields.io/nuget/dt/RedisRateLimiting)](https://www.nuget.org/packages/RedisRateLimiting) 
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=cristipufu_aspnetcore-redis-rate-limiting&metric=coverage&token=5fea970e583d49909265cbcc99a54f2b5a9d3c19)](https://sonarcloud.io/summary/new_code?id=cristipufu_aspnetcore-redis-rate-limiting)
 [![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=cristipufu_aspnetcore-redis-rate-limiting&metric=code_smells&token=5fea970e583d49909265cbcc99a54f2b5a9d3c19)](https://sonarcloud.io/summary/new_code?id=cristipufu_aspnetcore-redis-rate-limiting)
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=cristipufu_aspnetcore-redis-rate-limiting&metric=vulnerabilities&token=5fea970e583d49909265cbcc99a54f2b5a9d3c19)](https://sonarcloud.io/summary/new_code?id=cristipufu_aspnetcore-redis-rate-limiting)
