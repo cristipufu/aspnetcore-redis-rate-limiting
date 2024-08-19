@@ -32,4 +32,7 @@
 	<ItemGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
 		<PackageReference Include="RedisRateLimiting" Version="1.2.0" />
 	</ItemGroup>
+	<ItemGroup>
+	  <PackageReference Include="StackExchange.Redis" Version="2.8.0" />
+	</ItemGroup>
 </Project>
