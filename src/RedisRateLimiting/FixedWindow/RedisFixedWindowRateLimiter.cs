@@ -10,8 +10,6 @@ namespace RedisRateLimiting
 {
     public class RedisFixedWindowRateLimiter<TKey> : RateLimiter
     {
-        private static readonly double TickFrequency = (double)TimeSpan.TicksPerSecond / Stopwatch.Frequency;
-
         private readonly RedisFixedWindowManager _redisManager;
         private readonly RedisFixedWindowRateLimiterOptions _options;
 
@@ -22,7 +20,7 @@ namespace RedisRateLimiting
 
         public override TimeSpan? IdleDuration => Interlocked.CompareExchange(ref _activeRequestsCount, 0, 0) > 0
             ? null
-            : new TimeSpan((long)((Stopwatch.GetTimestamp() - _idleSince) * TickFrequency));
+            : Stopwatch.GetElapsedTime(_idleSince);
 
         public RedisFixedWindowRateLimiter(TKey partitionKey, RedisFixedWindowRateLimiterOptions options)
         {
