@@ -10,8 +10,6 @@ namespace RedisRateLimiting
 {
     public class RedisTokenBucketRateLimiter<TKey> : RateLimiter
     {
-        private static readonly double TickFrequency = (double)TimeSpan.TicksPerSecond / Stopwatch.Frequency;
-
         private readonly RedisTokenBucketManager _redisManager;
         private readonly RedisTokenBucketRateLimiterOptions _options;
 
@@ -22,7 +20,7 @@ namespace RedisRateLimiting
 
         public override TimeSpan? IdleDuration => Interlocked.CompareExchange(ref _activeRequestsCount, 0, 0) > 0
             ? null
-            : new TimeSpan((long)((Stopwatch.GetTimestamp() - _idleSince) * TickFrequency));
+            : Stopwatch.GetElapsedTime(_idleSince);
 
         public RedisTokenBucketRateLimiter(TKey partitionKey, RedisTokenBucketRateLimiterOptions options)
         {
