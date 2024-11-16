@@ -38,6 +38,8 @@ namespace RedisRateLimiting.Concurrency
                 redis.call(""hincrby"", @stats_key, 'total_failed', 1)
             end
 
+            redis.call(""pexpireat"", @stats_key, expireAtMilliseconds)
+
             return { allowed, count }");
 
         private static readonly LuaScript StatisticsScript = LuaScript.Prepare(
