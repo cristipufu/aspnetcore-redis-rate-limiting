@@ -2,16 +2,16 @@
 using System;
 using System.Threading.Tasks;
 
-namespace RedisRateLimiting.Concurrency
-{
-    internal class RedisTokenBucketManager
-    {
-        private readonly IConnectionMultiplexer _connectionMultiplexer;
-        private readonly RedisTokenBucketRateLimiterOptions _options;
-        private readonly RedisKey RateLimitKey;
-        private readonly RedisKey RateLimitTimestampKey;
+namespace RedisRateLimiting.Concurrency;
 
-        private static readonly LuaScript Script = LuaScript.Prepare(@"
+internal class RedisTokenBucketManager
+{
+    private readonly IConnectionMultiplexer _connectionMultiplexer;
+    private readonly RedisTokenBucketRateLimiterOptions _options;
+    private readonly RedisKey RateLimitKey;
+    private readonly RedisKey RateLimitTimestampKey;
+
+    private static readonly LuaScript Script = LuaScript.Prepare(@"
             -- Prepare the input and force the correct data types.
             local limit = tonumber(@token_limit)
             local rate = tonumber(@tokens_per_period)
@@ -65,80 +65,79 @@ namespace RedisRateLimiting.Concurrency
 
             return { allowed, current_tokens, retry_after }");
 
-        public RedisTokenBucketManager(
-            string partitionKey,
-            RedisTokenBucketRateLimiterOptions options)
-        {
-            _options = options;
-            _connectionMultiplexer = options.ConnectionMultiplexerFactory!.Invoke();
-
-            RateLimitKey = new RedisKey($"rl:tb:{{{partitionKey}}}");
-            RateLimitTimestampKey = new RedisKey($"rl:tb:{{{partitionKey}}}:ts");
-        }
-
-        internal async Task<RedisTokenBucketResponse> TryAcquireLeaseAsync(int permitCount)
-        {
-            var database = _connectionMultiplexer.GetDatabase();
-
-            var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
-                Script,
-                new
-                {
-                    rate_limit_key = RateLimitKey,
-                    timestamp_key = RateLimitTimestampKey,
-                    tokens_per_period = (RedisValue)_options.TokensPerPeriod,
-                    token_limit = (RedisValue)_options.TokenLimit,
-                    replenish_period = (RedisValue)_options.ReplenishmentPeriod.TotalMilliseconds,
-                    permit_count = (RedisValue)permitCount,
-                    current_time = (RedisValue)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                });
-
-            var result = new RedisTokenBucketResponse();
-
-            if (response != null)
-            {
-                result.Allowed = (bool)response[0];
-                result.Count = (long)response[1];
-                result.RetryAfter = (int)Math.Ceiling((decimal)response[2] / 1000);
-            }
-
-            return result;
-        }
-
-        internal RedisTokenBucketResponse TryAcquireLease()
-        {
-            var database = _connectionMultiplexer.GetDatabase();
-
-            var response = (RedisValue[]?)database.ScriptEvaluate(
-                Script,
-                new
-                {
-                    rate_limit_key = RateLimitKey,
-                    timestamp_key = RateLimitTimestampKey,
-                    tokens_per_period = (RedisValue)_options.TokensPerPeriod,
-                    token_limit = (RedisValue)_options.TokenLimit,
-                    replenish_period = (RedisValue)_options.ReplenishmentPeriod.TotalMilliseconds,
-                    permit_count = (RedisValue)1D,
-                    current_time = (RedisValue)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                });
-
-            var result = new RedisTokenBucketResponse();
-
-            if (response != null)
-            {
-                result.Allowed = (bool)response[0];
-                result.Count = (long)response[1];
-                result.RetryAfter = (int)Math.Ceiling((decimal)response[2] / 1000);
-            }
-
-            return result;
-        }
-    }
-
-    internal class RedisTokenBucketResponse
+    public RedisTokenBucketManager(
+        string partitionKey,
+        RedisTokenBucketRateLimiterOptions options)
     {
-        internal bool Allowed { get; set; }
-        internal long Count { get; set; }
-        internal int RetryAfter { get; set; }
+        _options = options;
+        _connectionMultiplexer = options.ConnectionMultiplexerFactory!.Invoke();
+
+        RateLimitKey = new RedisKey($"rl:tb:{{{partitionKey}}}");
+        RateLimitTimestampKey = new RedisKey($"rl:tb:{{{partitionKey}}}:ts");
     }
+
+    internal async Task<RedisTokenBucketResponse> TryAcquireLeaseAsync(int permitCount)
+    {
+        var database = _connectionMultiplexer.GetDatabase();
+
+        var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
+            Script,
+            new
+            {
+                rate_limit_key = RateLimitKey,
+                timestamp_key = RateLimitTimestampKey,
+                tokens_per_period = (RedisValue)_options.TokensPerPeriod,
+                token_limit = (RedisValue)_options.TokenLimit,
+                replenish_period = (RedisValue)_options.ReplenishmentPeriod.TotalMilliseconds,
+                permit_count = (RedisValue)permitCount,
+                current_time = (RedisValue)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            });
+
+        var result = new RedisTokenBucketResponse();
+
+        if (response != null)
+        {
+            result.Allowed = (bool)response[0];
+            result.Count = (long)response[1];
+            result.RetryAfter = (int)Math.Ceiling((decimal)response[2] / 1000);
+        }
+
+        return result;
+    }
+
+    internal RedisTokenBucketResponse TryAcquireLease()
+    {
+        var database = _connectionMultiplexer.GetDatabase();
+
+        var response = (RedisValue[]?)database.ScriptEvaluate(
+            Script,
+            new
+            {
+                rate_limit_key = RateLimitKey,
+                timestamp_key = RateLimitTimestampKey,
+                tokens_per_period = (RedisValue)_options.TokensPerPeriod,
+                token_limit = (RedisValue)_options.TokenLimit,
+                replenish_period = (RedisValue)_options.ReplenishmentPeriod.TotalMilliseconds,
+                permit_count = (RedisValue)1D,
+                current_time = (RedisValue)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            });
+
+        var result = new RedisTokenBucketResponse();
+
+        if (response != null)
+        {
+            result.Allowed = (bool)response[0];
+            result.Count = (long)response[1];
+            result.RetryAfter = (int)Math.Ceiling((decimal)response[2] / 1000);
+        }
+
+        return result;
+    }
+}
+
+internal class RedisTokenBucketResponse
+{
+    internal bool Allowed { get; set; }
+    internal long Count { get; set; }
+    internal int RetryAfter { get; set; }
 }

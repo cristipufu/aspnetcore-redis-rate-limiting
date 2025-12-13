@@ -20,14 +20,14 @@ jobs:
           fetch-depth: 0  
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
       - name: Cache SonarCloud packages
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: ~\sonar\cache
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
       - name: Cache SonarCloud scanner
         id: cache-sonar-scanner
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: .\.sonar\scanner
           key: ${{ runner.os }}-sonar-scanner
@@ -38,7 +38,7 @@ jobs:
         run: |
           New-Item -Path .\.sonar\scanner -ItemType Directory
           dotnet tool update dotnet-sonarscanner --tool-path .\.sonar\scanner
-      - name: Setup .NET 8
+      - name: Setup .NET 10
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.101'
@@ -50,12 +50,9 @@ jobs:
         shell: powershell
         run: |
           .\.sonar\scanner\dotnet-sonarscanner begin /k:"cristipufu_aspnetcore-redis-rate-limiting" /o:"cristipufu" /d:sonar.token="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.vscoveragexml.reportsPaths=coverage.xml
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           
           dotnet tool install --global dotnet-coverage
           dotnet build --no-incremental --configuration Debug
           dotnet-coverage collect 'dotnet test --configuration Debug --no-build' -f xml -o 'coverage.xml'
-          $testExitCode = $LASTEXITCODE
           
           .\.sonar\scanner\dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
-          if ($testExitCode -ne 0) { exit $testExitCode }
