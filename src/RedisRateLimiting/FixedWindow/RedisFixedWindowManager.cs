@@ -2,17 +2,17 @@
 using System;
 using System.Threading.Tasks;
 
-namespace RedisRateLimiting.Concurrency
-{
-    internal class RedisFixedWindowManager
-    {
-        private readonly IConnectionMultiplexer _connectionMultiplexer;
-        private readonly RedisFixedWindowRateLimiterOptions _options;
-        private readonly RedisKey RateLimitKey;
-        private readonly RedisKey RateLimitExpireKey;
+namespace RedisRateLimiting.Concurrency;
 
-        private static readonly LuaScript Script = LuaScript.Prepare(
-          @"local expires_at = tonumber(redis.call(""get"", @expires_at_key))
+internal class RedisFixedWindowManager
+{
+    private readonly IConnectionMultiplexer _connectionMultiplexer;
+    private readonly RedisFixedWindowRateLimiterOptions _options;
+    private readonly RedisKey RateLimitKey;
+    private readonly RedisKey RateLimitExpireKey;
+
+    private static readonly LuaScript Script = LuaScript.Prepare(
+      @"local expires_at = tonumber(redis.call(""get"", @expires_at_key))
             local limit = tonumber(@permit_limit)
             local inc = tonumber(@increment_amount)
 
@@ -51,85 +51,84 @@ namespace RedisRateLimiting.Concurrency
             return { current, expires_at, allowed } 
         ");
 
-        public RedisFixedWindowManager(
-            string partitionKey,
-            RedisFixedWindowRateLimiterOptions options)
-        {
-            _options = options;
-            _connectionMultiplexer = options.ConnectionMultiplexerFactory!.Invoke();
-
-            RateLimitKey = new RedisKey($"rl:fw:{{{partitionKey}}}");
-            RateLimitExpireKey = new RedisKey($"rl:fw:{{{partitionKey}}}:exp");
-        }
-
-        internal async Task<RedisFixedWindowResponse> TryAcquireLeaseAsync(int permitCount)
-        {
-            var now = DateTimeOffset.UtcNow;
-            var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
-
-            var database = _connectionMultiplexer.GetDatabase();
-
-            var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
-                Script,
-                new
-                {
-                    rate_limit_key = RateLimitKey,
-                    expires_at_key = RateLimitExpireKey,
-                    next_expires_at = (RedisValue)now.Add(_options.Window).ToUnixTimeSeconds(),
-                    current_time = (RedisValue)nowUnixTimeSeconds,
-                    permit_limit = (RedisValue)_options.PermitLimit,
-                    increment_amount = (RedisValue)permitCount,
-                });
-
-            var result = new RedisFixedWindowResponse();
-
-            if (response != null)
-            {
-                result.Count = (long)response[0];
-                result.ExpiresAt = (long)response[1];
-                result.Allowed = (bool)response[2];
-                result.RetryAfter = TimeSpan.FromSeconds(result.ExpiresAt - nowUnixTimeSeconds);
-            }
-
-            return result;
-        }
-
-        internal RedisFixedWindowResponse TryAcquireLease()
-        {
-            var now = DateTimeOffset.UtcNow;
-            var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
-
-            var database = _connectionMultiplexer.GetDatabase();
-
-            var response = (RedisValue[]?)database.ScriptEvaluate(
-                Script,
-                new
-                {
-                    rate_limit_key = RateLimitKey,
-                    expires_at_key = RateLimitExpireKey,
-                    next_expires_at = (RedisValue)now.Add(_options.Window).ToUnixTimeSeconds(),
-                    current_time = (RedisValue)nowUnixTimeSeconds,
-                    increment_amount = (RedisValue)1D,
-                });
-
-            var result = new RedisFixedWindowResponse();
-
-            if (response != null)
-            {
-                result.Count = (long)response[0];
-                result.ExpiresAt = (long)response[1];
-                result.RetryAfter = TimeSpan.FromSeconds(result.ExpiresAt - nowUnixTimeSeconds);
-            }
-
-            return result;
-        }
-    }
-
-    internal class RedisFixedWindowResponse
+    public RedisFixedWindowManager(
+        string partitionKey,
+        RedisFixedWindowRateLimiterOptions options)
     {
-        internal long ExpiresAt { get; set; }
-        internal TimeSpan RetryAfter { get; set; }
-        internal long Count { get; set; }
-        internal bool Allowed { get; set; }
+        _options = options;
+        _connectionMultiplexer = options.ConnectionMultiplexerFactory!.Invoke();
+
+        RateLimitKey = new RedisKey($"rl:fw:{{{partitionKey}}}");
+        RateLimitExpireKey = new RedisKey($"rl:fw:{{{partitionKey}}}:exp");
     }
+
+    internal async Task<RedisFixedWindowResponse> TryAcquireLeaseAsync(int permitCount)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
+
+        var database = _connectionMultiplexer.GetDatabase();
+
+        var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
+            Script,
+            new
+            {
+                rate_limit_key = RateLimitKey,
+                expires_at_key = RateLimitExpireKey,
+                next_expires_at = (RedisValue)now.Add(_options.Window).ToUnixTimeSeconds(),
+                current_time = (RedisValue)nowUnixTimeSeconds,
+                permit_limit = (RedisValue)_options.PermitLimit,
+                increment_amount = (RedisValue)permitCount,
+            });
+
+        var result = new RedisFixedWindowResponse();
+
+        if (response != null)
+        {
+            result.Count = (long)response[0];
+            result.ExpiresAt = (long)response[1];
+            result.Allowed = (bool)response[2];
+            result.RetryAfter = TimeSpan.FromSeconds(result.ExpiresAt - nowUnixTimeSeconds);
+        }
+
+        return result;
+    }
+
+    internal RedisFixedWindowResponse TryAcquireLease()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var nowUnixTimeSeconds = now.ToUnixTimeSeconds();
+
+        var database = _connectionMultiplexer.GetDatabase();
+
+        var response = (RedisValue[]?)database.ScriptEvaluate(
+            Script,
+            new
+            {
+                rate_limit_key = RateLimitKey,
+                expires_at_key = RateLimitExpireKey,
+                next_expires_at = (RedisValue)now.Add(_options.Window).ToUnixTimeSeconds(),
+                current_time = (RedisValue)nowUnixTimeSeconds,
+                increment_amount = (RedisValue)1D,
+            });
+
+        var result = new RedisFixedWindowResponse();
+
+        if (response != null)
+        {
+            result.Count = (long)response[0];
+            result.ExpiresAt = (long)response[1];
+            result.RetryAfter = TimeSpan.FromSeconds(result.ExpiresAt - nowUnixTimeSeconds);
+        }
+
+        return result;
+    }
+}
+
+internal class RedisFixedWindowResponse
+{
+    internal long ExpiresAt { get; set; }
+    internal TimeSpan RetryAfter { get; set; }
+    internal long Count { get; set; }
+    internal bool Allowed { get; set; }
 }

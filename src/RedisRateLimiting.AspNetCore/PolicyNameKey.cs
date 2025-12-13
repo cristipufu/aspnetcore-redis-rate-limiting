@@ -1,27 +1,25 @@
-﻿namespace RedisRateLimiting.AspNetCore
+﻿namespace RedisRateLimiting.AspNetCore;
+
+internal sealed class PolicyNameKey
 {
-    internal sealed class PolicyNameKey
+    public required string PolicyName { get; init; }
+
+    public override bool Equals(object? obj)
     {
-        public required string PolicyName { get; init; }
-
-        public override bool Equals(object? obj)
+        if (obj is PolicyNameKey key)
         {
-            if (obj is PolicyNameKey key)
-            {
-                return PolicyName == key.PolicyName;
-            }
-            return false;
+            return PolicyName == key.PolicyName;
         }
-
-        public override int GetHashCode()
-        {
-            return PolicyName.GetHashCode();
-        }
-
-        public override string ToString()
-        {
-            return PolicyName;
-        }
+        return false;
     }
 
+    public override int GetHashCode()
+    {
+        return PolicyName.GetHashCode();
+    }
+
+    public override string ToString()
+    {
+        return PolicyName;
+    }
 }
