@@ -18,8 +18,8 @@ internal class RedisConcurrencyManager
             local queue_limit = tonumber(@queue_limit)
             local try_enqueue = tonumber(@try_enqueue)
             local timestamp = tonumber(@current_time)
-            -- max seconds it takes to complete a request
-            local ttl = 60
+            -- max milliseconds it takes to complete a request
+            local ttl = 60000
 
             redis.call(""zremrangebyscore"", @rate_limit_key, '-inf', timestamp - ttl)
 
@@ -116,7 +116,7 @@ internal class RedisConcurrencyManager
 
     internal async Task<RedisConcurrencyResponse> TryAcquireLeaseAsync(string requestId, bool tryEnqueue = false)
     {
-        var nowUnixTimeSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var unixTimeMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
         var database = _connectionMultiplexer.GetDatabase();
 
@@ -130,7 +130,7 @@ internal class RedisConcurrencyManager
                 permit_limit = (RedisValue)_options.PermitLimit,
                 try_enqueue = (RedisValue)(tryEnqueue ? 1 : 0),
                 queue_limit = (RedisValue)_options.QueueLimit,
-                current_time = (RedisValue)nowUnixTimeSeconds,
+                current_time = (RedisValue)unixTimeMilliseconds,
                 unique_id = (RedisValue)requestId,
             });
 
@@ -149,7 +149,7 @@ internal class RedisConcurrencyManager
 
     internal RedisConcurrencyResponse TryAcquireLease(string requestId, bool tryEnqueue = false)
     {
-        var nowUnixTimeSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var unixTimeMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
         var database = _connectionMultiplexer.GetDatabase();
 
@@ -163,7 +163,7 @@ internal class RedisConcurrencyManager
                 permit_limit = (RedisValue)_options.PermitLimit,
                 try_enqueue = (RedisValue)(tryEnqueue ? 1 : 0),
                 queue_limit = (RedisValue)_options.QueueLimit,
-                current_time = (RedisValue)nowUnixTimeSeconds,
+                current_time = (RedisValue)unixTimeMilliseconds,
                 unique_id = (RedisValue)requestId,
             });
 
