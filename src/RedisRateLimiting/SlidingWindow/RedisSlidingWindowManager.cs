@@ -28,7 +28,7 @@ internal class RedisSlidingWindowManager
                 redis.call(""zadd"", @rate_limit_key, timestamp, @unique_id)
             end
 
-            local expireAtMilliseconds = math.floor((timestamp + window) * 1000 + 1);
+            local expireAtMilliseconds = timestamp + window + 1;
             redis.call(""pexpireat"", @rate_limit_key, expireAtMilliseconds)
 
             if allowed
@@ -63,7 +63,7 @@ internal class RedisSlidingWindowManager
     internal async Task<RedisSlidingWindowResponse> TryAcquireLeaseAsync(string requestId)
     {
         var now = DateTimeOffset.UtcNow;
-        double nowUnixTimeSeconds = now.ToUnixTimeMilliseconds() / 1000.0;
+        var unixTimeMilliseconds = now.ToUnixTimeMilliseconds();
 
         var database = _connectionMultiplexer.GetDatabase();
 
@@ -74,8 +74,8 @@ internal class RedisSlidingWindowManager
                 rate_limit_key = RateLimitKey,
                 stats_key = StatsRateLimitKey,
                 permit_limit = (RedisValue)_options.PermitLimit,
-                window = (RedisValue)_options.Window.TotalSeconds,
-                current_time = (RedisValue)nowUnixTimeSeconds,
+                window = (RedisValue)_options.Window.TotalMilliseconds,
+                current_time = (RedisValue)unixTimeMilliseconds,
                 unique_id = (RedisValue)requestId,
             });
 
@@ -93,7 +93,7 @@ internal class RedisSlidingWindowManager
     internal RedisSlidingWindowResponse TryAcquireLease(string requestId)
     {
         var now = DateTimeOffset.UtcNow;
-        double nowUnixTimeSeconds = now.ToUnixTimeMilliseconds() / 1000.0;
+        var unixTimeMilliseconds = now.ToUnixTimeMilliseconds();
 
         var database = _connectionMultiplexer.GetDatabase();
 
@@ -104,8 +104,8 @@ internal class RedisSlidingWindowManager
                rate_limit_key = RateLimitKey,
                stats_key = StatsRateLimitKey,
                permit_limit = (RedisValue)_options.PermitLimit,
-               window = (RedisValue)_options.Window.TotalSeconds,
-               current_time = (RedisValue)nowUnixTimeSeconds,
+               window = (RedisValue)_options.Window.TotalMilliseconds,
+               current_time = (RedisValue)unixTimeMilliseconds,
                unique_id = (RedisValue)requestId,
            });
 
