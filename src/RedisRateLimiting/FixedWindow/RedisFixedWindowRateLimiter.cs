@@ -70,6 +70,8 @@ public class RedisFixedWindowRateLimiter<TKey> : RateLimiter
         return FailedLease;
     }
 
+    protected virtual void AddCustomMetadata(FixedWindowLeaseContext context) { }
+
     private async ValueTask<RateLimitLease> AcquireAsyncCoreInternal(int permitCount)
     {
         var leaseContext = new FixedWindowLeaseContext
@@ -77,6 +79,8 @@ public class RedisFixedWindowRateLimiter<TKey> : RateLimiter
             Limit = _options.PermitLimit,
             Window = _options.Window,
         };
+
+        AddCustomMetadata(leaseContext);
 
         RedisFixedWindowResponse response;
         Interlocked.Increment(ref _activeRequestsCount);
@@ -97,13 +101,27 @@ public class RedisFixedWindowRateLimiter<TKey> : RateLimiter
         return new FixedWindowLease(isAcquired: response.Allowed, leaseContext);
     }
 
-    private sealed class FixedWindowLeaseContext
+    protected sealed class FixedWindowLeaseContext
     {
+        private Dictionary<string, object> _additionalMetadata = new();
+
         public long Count { get; set; }
 
         public long Limit { get; set; }
 
         public TimeSpan Window { get; set; }
+
+        public void AddCustomMetadata(string name, object value)
+        {
+            _additionalMetadata[name] = value;
+        }
+
+        public bool TryGetCustomMetadata(string name, out object value)
+        {
+            return _additionalMetadata.TryGetValue(name, out value);
+        }
+
+        public IEnumerable<string> AdditionalMetadataNames => _additionalMetadata.Keys;
 
         public TimeSpan? RetryAfter { get; set; }
 
@@ -112,7 +130,7 @@ public class RedisFixedWindowRateLimiter<TKey> : RateLimiter
 
     private sealed class FixedWindowLease : RateLimitLease
     {
-        private static readonly string[] s_allMetadataNames = { RateLimitMetadataName.Limit.Name, RateLimitMetadataName.Remaining.Name, RateLimitMetadataName.RetryAfter.Name };
+        private readonly ISet<string> s_allMetadataNames;
 
         private readonly FixedWindowLeaseContext? _context;
 
@@ -120,6 +138,19 @@ public class RedisFixedWindowRateLimiter<TKey> : RateLimiter
         {
             IsAcquired = isAcquired;
             _context = context;
+            s_allMetadataNames = new HashSet<string>
+            {
+                RateLimitMetadataName.Limit.Name, RateLimitMetadataName.Remaining.Name,
+                RateLimitMetadataName.RetryAfter.Name
+            };
+
+            if (context?.AdditionalMetadataNames is not null)
+            {
+                foreach (var name in context.AdditionalMetadataNames)
+                {
+                    s_allMetadataNames.Add(name);
+                }
+            }
         }
 
         public override bool IsAcquired { get; }
@@ -149,6 +180,11 @@ public class RedisFixedWindowRateLimiter<TKey> : RateLimiter
             if (metadataName == RateLimitMetadataName.Reset.Name && _context?.ExpiresAt is not null)
             {
                 metadata = _context.ExpiresAt.Value;
+                return true;
+            }
+
+            if (_context != null && _context.TryGetCustomMetadata(metadataName, out metadata))
+            {
                 return true;
             }
 
