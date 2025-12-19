@@ -24,10 +24,8 @@ public class RedisFixedWindowRateLimiter<TKey> : RateLimiter
 
     public RedisFixedWindowRateLimiter(TKey partitionKey, RedisFixedWindowRateLimiterOptions options)
     {
-        if (options is null)
-        {
-            throw new ArgumentNullException(nameof(options));
-        }
+        ArgumentNullException.ThrowIfNull(options);
+
         if (options.PermitLimit <= 0)
         {
             throw new ArgumentException(string.Format("{0} must be set to a value greater than 0.", nameof(options.PermitLimit)), nameof(options));
@@ -185,9 +183,8 @@ public class RedisFixedWindowRateLimiter<TKey> : RateLimiter
                 return true;
             }
 
-            if (_context != null && _context.TryGetCustomMetadata(metadataName, out var metadataValue))
+            if (_context != null && _context.TryGetCustomMetadata(metadataName, out metadata))
             {
-                metadata = metadataValue;
                 return true;
             }
 
