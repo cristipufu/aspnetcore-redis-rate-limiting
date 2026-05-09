@@ -402,6 +402,86 @@ public class ConcurrencyUnitTests(TestFixture fixture) : IClassFixture<TestFixtu
         Assert.True(limiter.IdleDuration < previousIdleDuration);
     }
 
+    [Fact]
+    public async Task GetStatisticsAndGetStatisticsAsyncReturnIdenticalResult()
+    {
+        using var limiter = new RedisConcurrencyRateLimiter<string>(
+                    partitionKey: Guid.NewGuid().ToString(),
+                    new RedisConcurrencyRateLimiterOptions
+                    {
+                        PermitLimit = 1,
+                        ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
+                    });
+
+        var lease = await limiter.AcquireAsync();
+        var lease2 = await limiter.AcquireAsync();
+
+        lease.Dispose();
+        lease = await limiter.AcquireAsync();
+
+        var stats = limiter.GetStatistics();
+        var asyncStats = await limiter.GetStatisticsAsync();
+
+        // The earlier CanAcquireAsyncResource() test validates that the stats are correct,
+        // so here we just want to validate that both methods return the same result.
+        Assert.Equal(stats.TotalSuccessfulLeases, asyncStats.TotalSuccessfulLeases);
+        Assert.Equal(stats.TotalFailedLeases, asyncStats.TotalFailedLeases);
+        Assert.Equal(stats.CurrentAvailablePermits, asyncStats.CurrentAvailablePermits);
+
+        lease.Dispose();
+
+        stats = limiter.GetStatistics();
+        asyncStats = await limiter.GetStatisticsAsync();
+        Assert.Equal(stats.CurrentAvailablePermits, asyncStats.CurrentAvailablePermits);
+    }
+
+    [Fact]
+    public async Task CanAcquireAsyncResourceAfterAsyncDispose()
+    {
+        using var limiter = new RedisConcurrencyRateLimiter<string>(
+            partitionKey: Guid.NewGuid().ToString(),
+            new RedisConcurrencyRateLimiterOptions
+            {
+                PermitLimit = 1,
+                ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
+            });
+
+        var lease = await limiter.AcquireAsync();
+        Assert.True(lease.IsAcquired);
+
+        var lease2 = await limiter.AcquireAsync();
+        Assert.False(lease2.IsAcquired);
+
+        if (lease is IAsyncDisposable asyncDisposableLease)
+        {
+            await asyncDisposableLease.DisposeAsync();
+        }
+        else
+        {
+            lease.Dispose();
+        }
+
+        lease = await limiter.AcquireAsync();
+        Assert.True(lease.IsAcquired);
+
+        var stats = limiter.GetStatistics();
+        Assert.Equal(2, stats.TotalSuccessfulLeases);
+        Assert.Equal(1, stats.TotalFailedLeases);
+        Assert.Equal(0, stats.CurrentAvailablePermits);
+
+        if (lease is IAsyncDisposable asyncDisposableLease3)
+        {
+            await asyncDisposableLease3.DisposeAsync();
+        }
+        else
+        {
+            lease.Dispose();
+        }
+
+        stats = limiter.GetStatistics();
+        Assert.Equal(1, stats.CurrentAvailablePermits);
+    }
+
     static internal void ForceDequeue(RedisConcurrencyRateLimiter<string> limiter)
     {
         var dequeueRequestsMethod = typeof(RedisConcurrencyRateLimiter<string>)

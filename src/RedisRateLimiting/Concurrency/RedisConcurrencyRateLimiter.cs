@@ -1,4 +1,5 @@
 ﻿using RedisRateLimiting.Concurrency;
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -71,6 +72,11 @@ public class RedisConcurrencyRateLimiter<TKey> : RateLimiter
     public override RateLimiterStatistics? GetStatistics()
     {
         return _redisManager.GetStatistics();
+    }
+
+    public async Task<RateLimiterStatistics?> GetStatisticsAsync()
+    {
+        return await _redisManager.GetStatisticsAsync();
     }
 
     protected override async ValueTask<RateLimitLease> AcquireAsyncCore(int permitCount, CancellationToken cancellationToken)
@@ -146,9 +152,18 @@ public class RedisConcurrencyRateLimiter<TKey> : RateLimiter
 
     private void Release(ConcurencyLeaseContext leaseContext)
     {
-        if (leaseContext.RequestId is null) return;
+        if (leaseContext.RequestId is null)
+            return;
 
         _ = _redisManager.ReleaseLeaseAsync(leaseContext.RequestId);
+    }
+
+    private async Task ReleaseAsync(ConcurencyLeaseContext leaseContext)
+    {
+        if (leaseContext.RequestId is null)
+            return;
+
+        await _redisManager.ReleaseLeaseAsync(leaseContext.RequestId);
     }
 
     private async Task StartDequeueTimerAsync(PeriodicTimer periodicTimer)
@@ -240,6 +255,8 @@ public class RedisConcurrencyRateLimiter<TKey> : RateLimiter
             request?.TaskCompletionSource?.TrySetResult(FailedLease);
         }
 
+        _redisManager?.Dispose();
+
         base.Dispose(disposing);
     }
 
@@ -259,7 +276,7 @@ public class RedisConcurrencyRateLimiter<TKey> : RateLimiter
         public long Limit { get; set; }
     }
 
-    private sealed class ConcurrencyLease : RateLimitLease
+    private sealed class ConcurrencyLease : RateLimitLease, IAsyncDisposable
     {
         private static readonly string[] s_allMetadataNames = { RateLimitMetadataName.Limit.Name, RateLimitMetadataName.Remaining.Name };
 
@@ -308,6 +325,30 @@ public class RedisConcurrencyRateLimiter<TKey> : RateLimiter
             if (_context != null)
             {
                 _limiter?.Release(_context);
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await DisposeAsyncCore();
+
+            GC.SuppressFinalize(this);
+        }
+
+        // Not stricktly required in a sealed class, we could just implement DisposeAsync directly, but this
+        // pattern allows for the class to be unsealed in the future without breaking the async disposal pattern.
+        private async ValueTask DisposeAsyncCore()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+
+            if (_context != null && _limiter != null)
+            {
+                await _limiter.ReleaseAsync(_context);
             }
         }
     }

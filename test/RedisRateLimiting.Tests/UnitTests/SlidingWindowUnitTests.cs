@@ -124,7 +124,7 @@ public class SlidingWindowUnitTests(TestFixture fixture) : IClassFixture<TestFix
         using var lease4 = await limiter.AcquireAsync();
         Assert.False(lease4.IsAcquired);
     }
-    
+
     [Fact]
     public async Task IdleDurationIsUpdated()
     {
@@ -142,5 +142,40 @@ public class SlidingWindowUnitTests(TestFixture fixture) : IClassFixture<TestFix
         var previousIdleDuration = limiter.IdleDuration;
         using var lease = await limiter.AcquireAsync();
         Assert.True(limiter.IdleDuration < previousIdleDuration);
+    }
+
+    [Fact]
+    public async Task GetStatisticsAndGetStatisticsAsyncReturnIdenticalResult()
+    {
+        using var limiter = new RedisSlidingWindowRateLimiter<string>(
+            partitionKey: Guid.NewGuid().ToString(),
+            new RedisSlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 1,
+                Window = TimeSpan.FromMinutes(1),
+                ConnectionMultiplexerFactory = Fixture.ConnectionMultiplexerFactory,
+            });
+
+        using var lease = await limiter.AcquireAsync();
+        Assert.True(lease.IsAcquired);
+
+        using var lease2 = await limiter.AcquireAsync();
+        Assert.False(lease2.IsAcquired);
+
+        var stats = limiter.GetStatistics()!;
+        var asyncStats = await limiter.GetStatisticsAsync()!;
+
+        // The earlier CanAcquireAsyncResource() test validates that the stats are correct,
+        // so here we just want to validate that both methods return the same result.
+        Assert.Equal(stats.TotalSuccessfulLeases, asyncStats.TotalSuccessfulLeases);
+        Assert.Equal(stats.TotalFailedLeases, asyncStats.TotalFailedLeases);
+        Assert.Equal(stats.CurrentAvailablePermits, asyncStats.CurrentAvailablePermits);
+
+        lease.Dispose();
+        lease2.Dispose();
+
+        stats = limiter.GetStatistics()!;
+        asyncStats = await limiter.GetStatisticsAsync();
+        Assert.Equal(stats.CurrentAvailablePermits, asyncStats.CurrentAvailablePermits);
     }
 }

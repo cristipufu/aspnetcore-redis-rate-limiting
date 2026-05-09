@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace RedisRateLimiting.Concurrency;
 
-internal class RedisTokenBucketManager
+internal class RedisTokenBucketManager : IDisposable
 {
     private readonly IConnectionMultiplexer _connectionMultiplexer;
     private readonly RedisTokenBucketRateLimiterOptions _options;
@@ -64,6 +64,7 @@ internal class RedisTokenBucketManager
             end
 
             return { allowed, current_tokens, retry_after }");
+    private bool disposedValue;
 
     public RedisTokenBucketManager(
         string partitionKey,
@@ -132,6 +133,26 @@ internal class RedisTokenBucketManager
         }
 
         return result;
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposedValue)
+        {
+            if (disposing)
+            {
+                _connectionMultiplexer?.Dispose();
+            }
+
+            disposedValue = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
     }
 }
 

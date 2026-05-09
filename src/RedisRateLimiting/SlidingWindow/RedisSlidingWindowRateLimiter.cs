@@ -1,4 +1,5 @@
 ﻿using RedisRateLimiting.Concurrency;
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -12,6 +13,8 @@ public class RedisSlidingWindowRateLimiter<TKey> : RateLimiter
 {
     private readonly RedisSlidingWindowManager _redisManager;
     private readonly RedisSlidingWindowRateLimiterOptions _options;
+
+    private bool _disposed;
 
     private readonly SlidingWindowLease FailedLease = new(isAcquired: false, null);
 
@@ -52,6 +55,11 @@ public class RedisSlidingWindowRateLimiter<TKey> : RateLimiter
     public override RateLimiterStatistics? GetStatistics()
     {
         return _redisManager.GetStatistics();
+    }
+
+    public async Task<RateLimiterStatistics?> GetStatisticsAsync()
+    {
+        return await _redisManager.GetStatisticsAsync();
     }
 
     protected override async ValueTask<RateLimitLease> AcquireAsyncCore(int permitCount, CancellationToken cancellationToken)
@@ -100,6 +108,25 @@ public class RedisSlidingWindowRateLimiter<TKey> : RateLimiter
         }
 
         return new SlidingWindowLease(isAcquired: false, leaseContext);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (!disposing)
+        {
+            return;
+        }
+
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        _redisManager?.Dispose();
+
+        base.Dispose(disposing);
     }
 
     private sealed class SlidingWindowLeaseContext

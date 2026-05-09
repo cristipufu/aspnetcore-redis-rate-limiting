@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace RedisRateLimiting.Concurrency;
 
-internal class RedisFixedWindowManager
+internal class RedisFixedWindowManager : IDisposable
 {
     private readonly IConnectionMultiplexer _connectionMultiplexer;
     private readonly RedisFixedWindowRateLimiterOptions _options;
@@ -50,6 +50,7 @@ internal class RedisFixedWindowManager
 
             return { current, expires_at, allowed } 
         ");
+    private bool disposedValue;
 
     public RedisFixedWindowManager(
         string partitionKey,
@@ -122,6 +123,26 @@ internal class RedisFixedWindowManager
         }
 
         return result;
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposedValue)
+        {
+            if (disposing)
+            {
+                _connectionMultiplexer?.Dispose();
+            }
+
+            disposedValue = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
     }
 }
 

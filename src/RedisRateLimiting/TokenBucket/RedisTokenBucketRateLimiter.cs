@@ -13,6 +13,8 @@ public class RedisTokenBucketRateLimiter<TKey> : RateLimiter
     private readonly RedisTokenBucketManager _redisManager;
     private readonly RedisTokenBucketRateLimiterOptions _options;
 
+    private bool _disposed;
+
     private readonly TokenBucketLease FailedLease = new(isAcquired: false, null);
 
     private int _activeRequestsCount;
@@ -104,6 +106,25 @@ public class RedisTokenBucketRateLimiter<TKey> : RateLimiter
         }
 
         return new TokenBucketLease(isAcquired: false, leaseContext);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (!disposing)
+        {
+            return;
+        }
+
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        _redisManager?.Dispose();
+
+        base.Dispose(disposing);
     }
 
     private sealed class TokenBucketLeaseContext

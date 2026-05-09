@@ -1,13 +1,13 @@
 ﻿using Microsoft.Extensions.Configuration;
+
 using StackExchange.Redis;
 
 namespace RedisRateLimiting.Tests.UnitTests;
 
-public class TestFixture : IDisposable
+public class TestFixture
 {
     public readonly IConfiguration Configuration;
-    public readonly IConnectionMultiplexer ConnectionMultiplexer;
-    public Func<IConnectionMultiplexer> ConnectionMultiplexerFactory;
+    public readonly ConfigurationOptions RedisOptions;
 
     public TestFixture()
     {
@@ -17,23 +17,17 @@ public class TestFixture : IDisposable
             .AddEnvironmentVariables()
             .Build();
 
-        var redisOptions = ConfigurationOptions.Parse(Configuration.GetConnectionString("Redis"));
-        ConnectionMultiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(redisOptions);
-
-        ConnectionMultiplexerFactory = () => ConnectionMultiplexer;
+        RedisOptions = ConfigurationOptions.Parse(Configuration.GetConnectionString("Redis"));
     }
 
-    public void Dispose()
+    public IConnectionMultiplexer ConnectionMultiplexerFactory()
     {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            ConnectionMultiplexer?.Dispose();
-        }
+        // Because the RateLimiters use a Factory pattern to create the IConnectionMultiplexer,
+        // they should be responsible for disposal.
+        // Ergo the implementation of ConnectionMultiplexerFactory must return a unique instance
+        // of the ConnectionMultiplexer on every call. Inefficient for the Unit Tests, but
+        // inconsequential in real-world scenarios where the RateLimiter itself will only be
+        // instantiated once.
+        return StackExchange.Redis.ConnectionMultiplexer.Connect(RedisOptions);
     }
 }

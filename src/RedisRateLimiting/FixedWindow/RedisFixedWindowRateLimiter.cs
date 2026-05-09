@@ -13,6 +13,8 @@ public class RedisFixedWindowRateLimiter<TKey> : RateLimiter
     private readonly RedisFixedWindowManager _redisManager;
     private readonly RedisFixedWindowRateLimiterOptions _options;
 
+    private bool _disposed;
+
     private readonly FixedWindowLease FailedLease = new(isAcquired: false, null);
 
     private int _activeRequestsCount;
@@ -95,6 +97,25 @@ public class RedisFixedWindowRateLimiter<TKey> : RateLimiter
         leaseContext.ExpiresAt = response.ExpiresAt;
 
         return new FixedWindowLease(isAcquired: response.Allowed, leaseContext);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (!disposing)
+        {
+            return;
+        }
+
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        _redisManager?.Dispose();
+
+        base.Dispose(disposing);
     }
 
     private sealed class FixedWindowLeaseContext

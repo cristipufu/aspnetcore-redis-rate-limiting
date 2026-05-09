@@ -1,11 +1,12 @@
 ﻿using StackExchange.Redis;
+
 using System;
 using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 
 namespace RedisRateLimiting.Concurrency;
 
-internal class RedisSlidingWindowManager
+internal class RedisSlidingWindowManager : IDisposable
 {
     private readonly IConnectionMultiplexer _connectionMultiplexer;
     private readonly RedisSlidingWindowRateLimiterOptions _options;
@@ -48,6 +49,7 @@ internal class RedisSlidingWindowManager
             local total_failed_count = redis.call(""hget"", @stats_key, 'total_failed')
 
             return { count, total_successful_count, total_failed_count }");
+    private bool disposedValue;
 
     public RedisSlidingWindowManager(
         string partitionKey,
@@ -143,6 +145,51 @@ internal class RedisSlidingWindowManager
             TotalSuccessfulLeases = (long)response[1],
             TotalFailedLeases = (long)response[2],
         };
+    }
+
+    internal async Task<RateLimiterStatistics?> GetStatisticsAsync()
+    {
+        var database = _connectionMultiplexer.GetDatabase();
+
+        var response = (RedisValue[]?)await database.ScriptEvaluateAsync(
+            StatisticsScript,
+            new
+            {
+                rate_limit_key = RateLimitKey,
+                stats_key = StatsRateLimitKey,
+            });
+
+        if (response == null)
+        {
+            return null;
+        }
+
+        return new RateLimiterStatistics
+        {
+            CurrentAvailablePermits = _options.PermitLimit - (long)response[0],
+            TotalSuccessfulLeases = (long)response[1],
+            TotalFailedLeases = (long)response[2],
+        };
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposedValue)
+        {
+            if (disposing)
+            {
+                _connectionMultiplexer?.Dispose();
+            }
+
+            disposedValue = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
     }
 }
 
