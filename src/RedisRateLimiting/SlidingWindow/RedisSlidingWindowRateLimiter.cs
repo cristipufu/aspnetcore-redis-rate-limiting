@@ -62,6 +62,8 @@ public class RedisSlidingWindowRateLimiter<TKey> : RateLimiter
             throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.PermitLimit));
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+
         Interlocked.Increment(ref _activeRequestsCount);
         try
         {
