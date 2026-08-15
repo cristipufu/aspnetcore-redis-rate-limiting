@@ -61,6 +61,8 @@ public class RedisFixedWindowRateLimiter<TKey> : RateLimiter
             throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, string.Format("{0} permit(s) exceeds the permit limit of {1}.", permitCount, _options.PermitLimit));
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+
         return AcquireAsyncCoreInternal(permitCount);
     }
 
